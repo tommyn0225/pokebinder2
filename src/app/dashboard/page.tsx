@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import LogoutButton from './LogoutButton'
 
@@ -21,8 +22,18 @@ export default async function DashboardPage() {
           <LogoutButton />
         </div>
       </header>
-      <main className="max-w-4xl mx-auto px-6 py-12 text-center text-gray-400">
-        <p className="text-lg">Your collection is empty — binders coming soon.</p>
+      <main className="max-w-4xl mx-auto px-6 py-12">
+        <div className="text-center text-gray-400 mb-8">
+          <p className="text-lg">Your collection is empty — binders coming soon.</p>
+        </div>
+        <div className="flex justify-center">
+          <Link
+            href="/search"
+            className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+          >
+            Search Cards
+          </Link>
+        </div>
       </main>
     </div>
   )
