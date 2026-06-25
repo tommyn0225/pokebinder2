@@ -36,18 +36,27 @@ function CardGrid({ cards }: { cards: Card[] }) {
   )
 }
 
+type Game = 'mtg' | 'pokemon' | 'onepiece'
+
+const GAMES: { value: Game; label: string; placeholder: string }[] = [
+  { value: 'mtg', label: 'MTG', placeholder: 'Search Magic: The Gathering cards…' },
+  { value: 'pokemon', label: 'Pokémon', placeholder: 'Search Pokémon cards…' },
+  { value: 'onepiece', label: 'One Piece', placeholder: 'Search One Piece cards…' },
+]
+
 export default function SearchPage() {
   const [query, setQuery] = useState('')
+  const [game, setGame] = useState<Game>('mtg')
   const [result, setResult] = useState<CardSearchResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const search = useCallback(async (q: string) => {
+  const search = useCallback(async (q: string, g: Game) => {
     if (q.trim().length < 2) return
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/cards/search?q=${encodeURIComponent(q)}&game=mtg`)
+      const res = await fetch(`/api/cards/search?q=${encodeURIComponent(q)}&game=${g}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Search failed.')
       setResult(data)
@@ -61,8 +70,10 @@ export default function SearchPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    search(query)
+    search(query, game)
   }
+
+  const placeholder = GAMES.find((g) => g.value === game)?.placeholder ?? 'Search cards…'
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -74,12 +85,29 @@ export default function SearchPage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8">
+        <div className="flex gap-2 mb-3">
+          {GAMES.map((g) => (
+            <button
+              key={g.value}
+              type="button"
+              onClick={() => { setGame(g.value); setResult(null); setError(null) }}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                game === g.value
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-white border text-gray-600 hover:border-indigo-400 hover:text-indigo-600'
+              }`}
+            >
+              {g.label}
+            </button>
+          ))}
+        </div>
+
         <form onSubmit={handleSubmit} className="flex gap-2">
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search MTG cards..."
+            placeholder={placeholder}
             className="flex-1 border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
           />
           <button

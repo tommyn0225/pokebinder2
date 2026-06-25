@@ -155,9 +155,17 @@ export default function HoldingsList({ binderId, initial }: Props) {
 
       {/* Holdings table */}
       <div>
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-          Cards in this Binder
-        </h2>
+        <div className="flex items-baseline justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+            Cards in this Binder
+          </h2>
+          <span className="text-sm text-gray-500">
+            Est. value:{' '}
+            <span className="font-semibold text-gray-800">
+              ${holdings.reduce((sum, h) => sum + (h.card_data.price.usd ?? 0) * h.quantity, 0).toFixed(2)}
+            </span>
+          </span>
+        </div>
         {holdings.length === 0 ? (
           <p className="text-center text-gray-400 py-12">
             No cards yet — search above to add some.

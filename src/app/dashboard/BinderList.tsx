@@ -4,12 +4,16 @@ import { useState } from 'react'
 import Link from 'next/link'
 import type { Binder } from '@/types/binder'
 
+interface BinderWithValue extends Binder {
+  total_usd: number
+}
+
 interface Props {
-  initial: Binder[]
+  initial: BinderWithValue[]
 }
 
 export default function BinderList({ initial }: Props) {
-  const [binders, setBinders] = useState<Binder[]>(initial)
+  const [binders, setBinders] = useState<BinderWithValue[]>(initial)
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -31,7 +35,7 @@ export default function BinderList({ initial }: Props) {
     if (!res.ok) {
       setError(json.error ?? 'Failed to create binder')
     } else {
-      setBinders(prev => [...prev, json])
+      setBinders(prev => [...prev, { ...json, total_usd: 0 }])
       setNewName('')
     }
     setCreating(false)
@@ -143,7 +147,8 @@ export default function BinderList({ initial }: Props) {
                   >
                     {binder.name}
                   </Link>
-                  <div className="flex gap-3 text-sm">
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="text-gray-500">${binder.total_usd.toFixed(2)}</span>
                     <button
                       onClick={() => startRename(binder)}
                       className="text-gray-500 hover:text-indigo-600 transition-colors"
