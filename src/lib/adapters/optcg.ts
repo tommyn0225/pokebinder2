@@ -1,4 +1,4 @@
-import type { Card, CardSearchResult, GameAdapter } from '@/types/card'
+import type { Card, CardSearchResult, GameAdapter, SearchFilters } from '@/types/card'
 import { getCached, setCached } from '@/lib/cache'
 
 const BASE_URL = 'https://api.pokewallet.io'
@@ -34,12 +34,22 @@ function mapCard(raw: any): Card {
 }
 
 export const optcgAdapter: GameAdapter = {
-  async search(query: string): Promise<CardSearchResult> {
-    const key = `optcg:search:${query}`
+  async search(query: string, filters?: SearchFilters): Promise<CardSearchResult> {
+    const setId = filters?.set
+    let url: string
+    let key: string
+
+    if (setId && !query.trim()) {
+      key = `optcg:set:${setId}`
+      url = `${BASE_URL}/op/sets/${encodeURIComponent(setId)}?limit=200`
+    } else {
+      key = `optcg:search:${query}`
+      url = `${BASE_URL}/op/search?q=${encodeURIComponent(query)}&limit=100`
+    }
+
     const cached = await getCached<CardSearchResult>(key)
     if (cached) return cached
 
-    const url = `${BASE_URL}/op/search?q=${encodeURIComponent(query)}&limit=20`
     const res = await fetch(url, { headers: getHeaders() })
 
     if (res.status === 404) {
@@ -50,12 +60,12 @@ export const optcgAdapter: GameAdapter = {
     if (!res.ok) throw new Error(`One Piece search failed: ${res.status}`)
 
     const data = await res.json()
-    const cards = Array.isArray(data.data) ? data.data : []
+    const raw = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : []
     const result: CardSearchResult = {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      cards: cards.map((c: any) => mapCard(c)),
-      total: data.total ?? cards.length,
-      has_more: (data.page ?? 1) * (data.limit ?? 20) < (data.total ?? 0),
+      cards: raw.map((c: any) => mapCard(c)),
+      total: data.total ?? raw.length,
+      has_more: (data.page ?? 1) * (data.limit ?? 100) < (data.total ?? 0),
     }
     await setCached(key, result, TTL)
     return result

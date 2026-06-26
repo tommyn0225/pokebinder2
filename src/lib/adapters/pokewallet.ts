@@ -1,4 +1,4 @@
-import type { Card, CardSearchResult, GameAdapter } from '@/types/card'
+import type { Card, CardSearchResult, GameAdapter, SearchFilters } from '@/types/card'
 import { getCached, setCached } from '@/lib/cache'
 
 const BASE_URL = 'https://api.pokewallet.io'
@@ -43,12 +43,24 @@ function mapCard(raw: any): Card {
 }
 
 export const pokewalletAdapter: GameAdapter = {
-  async search(query: string): Promise<CardSearchResult> {
-    const key = `pokewallet:search:${query}`
+  async search(query: string, filters?: SearchFilters): Promise<CardSearchResult> {
+    // If a set is selected and no query, browse the set directly
+    const setId = filters?.set
+    let url: string
+    let key: string
+
+    if (setId && !query.trim()) {
+      key = `pokewallet:set:${setId}`
+      url = `${BASE_URL}/sets/${encodeURIComponent(setId)}?limit=100`
+    } else {
+      const q = setId ? `${query.trim()} ${setId}`.trim() : query.trim()
+      key = `pokewallet:search:${q}`
+      url = `${BASE_URL}/search?q=${encodeURIComponent(q)}&limit=100`
+    }
+
     const cached = await getCached<CardSearchResult>(key)
     if (cached) return cached
 
-    const url = `${BASE_URL}/search?q=${encodeURIComponent(query)}&limit=20`
     const res = await fetch(url, { headers: getHeaders() })
 
     if (res.status === 404) {
@@ -59,11 +71,14 @@ export const pokewalletAdapter: GameAdapter = {
     if (!res.ok) throw new Error(`PokéWallet search failed: ${res.status}`)
 
     const data = await res.json()
-    const cards = Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : [])
+    const raw = Array.isArray(data.results) ? data.results
+      : Array.isArray(data.data) ? data.data
+      : Array.isArray(data) ? data
+      : []
     const result: CardSearchResult = {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      cards: cards.map((c: any) => mapCard(c)),
-      total: data.total ?? cards.length,
+      cards: raw.map((c: any) => mapCard(c)),
+      total: data.total ?? raw.length,
       has_more: data.has_more ?? false,
     }
     await setCached(key, result, TTL)

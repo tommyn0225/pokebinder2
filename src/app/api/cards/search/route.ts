@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { scryfallAdapter } from '@/lib/adapters/scryfall'
 import { pokewalletAdapter } from '@/lib/adapters/pokewallet'
 import { optcgAdapter } from '@/lib/adapters/optcg'
-import type { GameAdapter } from '@/types/card'
+import type { GameAdapter, SearchFilters } from '@/types/card'
 
 const adapters: Record<string, GameAdapter> = {
   mtg: scryfallAdapter,
@@ -11,10 +11,30 @@ const adapters: Record<string, GameAdapter> = {
 }
 
 export async function GET(req: NextRequest) {
-  const q = req.nextUrl.searchParams.get('q')?.trim()
-  const game = req.nextUrl.searchParams.get('game') ?? 'mtg'
+  const params = req.nextUrl.searchParams
+  const q = params.get('q')?.trim() ?? ''
+  const game = params.get('game') ?? 'mtg'
 
-  if (!q || q.length < 2) {
+  const filters: SearchFilters = {}
+  const set = params.get('set')
+  if (set) filters.set = set
+  const colors = params.get('colors')
+  if (colors) filters.colors = colors.split(',').filter(Boolean)
+  const type = params.get('type')
+  if (type) filters.type = type
+  const rarity = params.get('rarity')
+  if (rarity) filters.rarity = rarity
+  const priceMin = params.get('priceMin')
+  if (priceMin) filters.priceMin = parseFloat(priceMin)
+  const priceMax = params.get('priceMax')
+  if (priceMax) filters.priceMax = parseFloat(priceMax)
+
+  // Need at least a query or a filter to search
+  const hasFilter = Object.keys(filters).length > 0
+  if (!q && !hasFilter) {
+    return NextResponse.json({ error: 'Provide a search query or at least one filter.' }, { status: 400 })
+  }
+  if (q && q.length < 2) {
     return NextResponse.json({ error: 'Query must be at least 2 characters.' }, { status: 400 })
   }
 
@@ -24,7 +44,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const result = await adapter.search(q)
+    const result = await adapter.search(q, filters)
     return NextResponse.json(result)
   } catch {
     return NextResponse.json({ error: 'Search failed. Please try again.' }, { status: 500 })

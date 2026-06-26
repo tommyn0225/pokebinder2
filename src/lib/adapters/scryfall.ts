@@ -1,4 +1,4 @@
-import type { Card, CardSearchResult, GameAdapter } from '@/types/card'
+import type { Card, CardSearchResult, GameAdapter, SearchFilters } from '@/types/card'
 import { getCached, setCached } from '@/lib/cache'
 
 const BASE_URL = 'https://api.scryfall.com'
@@ -28,13 +28,25 @@ function mapCard(raw: any): Card {
   }
 }
 
+function buildScryfallQuery(query: string, filters?: SearchFilters): string {
+  const parts: string[] = []
+  if (query.trim()) parts.push(query.trim())
+  if (filters?.set) parts.push(`e:${filters.set}`)
+  if (filters?.colors && filters.colors.length > 0) parts.push(`c:${filters.colors.join('')}`)
+  if (filters?.type) parts.push(`t:${filters.type}`)
+  if (filters?.rarity) parts.push(`r:${filters.rarity}`)
+  // Need at least something to search
+  return parts.join(' ') || 'a'
+}
+
 export const scryfallAdapter: GameAdapter = {
-  async search(query: string): Promise<CardSearchResult> {
-    const key = `scryfall:search:${query}`
+  async search(query: string, filters?: SearchFilters): Promise<CardSearchResult> {
+    const builtQuery = buildScryfallQuery(query, filters)
+    const key = `scryfall:search:${builtQuery}`
     const cached = await getCached<CardSearchResult>(key)
     if (cached) return cached
 
-    const url = `${BASE_URL}/cards/search?q=${encodeURIComponent(query)}&order=name`
+    const url = `${BASE_URL}/cards/search?q=${encodeURIComponent(builtQuery)}&order=name`
     const res = await fetch(url, { headers: HEADERS })
 
     if (res.status === 404) {
