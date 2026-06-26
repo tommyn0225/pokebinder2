@@ -1,6 +1,8 @@
 import type { Card, CardSearchResult, GameAdapter } from '@/types/card'
+import { getCached, setCached } from '@/lib/cache'
 
 const BASE_URL = 'https://api.pokewallet.io'
+const TTL = 60 * 60 * 24 // 24h
 
 function getHeaders(): HeadersInit {
   const key = process.env.POKEWALLET_API_KEY
@@ -42,25 +44,41 @@ function mapCard(raw: any): Card {
 
 export const pokewalletAdapter: GameAdapter = {
   async search(query: string): Promise<CardSearchResult> {
-    const url = `${BASE_URL}/search?q=${encodeURIComponent(query)}&limit=20`
-    const res = await fetch(url, { headers: getHeaders(), next: { revalidate: 300 } })
+    const key = `pokewallet:search:${query}`
+    const cached = await getCached<CardSearchResult>(key)
+    if (cached) return cached
 
-    if (res.status === 404) return { cards: [], total: 0, has_more: false }
+    const url = `${BASE_URL}/search?q=${encodeURIComponent(query)}&limit=20`
+    const res = await fetch(url, { headers: getHeaders() })
+
+    if (res.status === 404) {
+      const empty: CardSearchResult = { cards: [], total: 0, has_more: false }
+      await setCached(key, empty, TTL)
+      return empty
+    }
     if (!res.ok) throw new Error(`PokéWallet search failed: ${res.status}`)
 
     const data = await res.json()
     const cards = Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : [])
-    return {
+    const result: CardSearchResult = {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       cards: cards.map((c: any) => mapCard(c)),
       total: data.total ?? cards.length,
       has_more: data.has_more ?? false,
     }
+    await setCached(key, result, TTL)
+    return result
   },
 
   async getById(id: string): Promise<Card | null> {
-    const res = await fetch(`${BASE_URL}/cards/${id}`, { headers: getHeaders(), next: { revalidate: 300 } })
+    const key = `pokewallet:card:${id}`
+    const cached = await getCached<Card>(key)
+    if (cached) return cached
+
+    const res = await fetch(`${BASE_URL}/cards/${id}`, { headers: getHeaders() })
     if (!res.ok) return null
-    return mapCard(await res.json())
+    const card = mapCard(await res.json())
+    await setCached(key, card, TTL)
+    return card
   },
 }
