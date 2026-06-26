@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import HoldingsList from './HoldingsList'
+import BinderValueChart from './BinderValueChart'
 import type { Holding } from '@/types/holding'
 
 export default async function BinderPage({
@@ -37,8 +38,23 @@ export default async function BinderPage({
         </Link>
         <h1 className="text-xl font-bold">{binder.name}</h1>
       </header>
-      <main className="max-w-4xl mx-auto px-6 py-10">
-        <HoldingsList binderId={id} initial={(holdings ?? []) as Holding[]} />
+      <main className="max-w-6xl mx-auto px-6 py-8">
+        <div className="flex gap-6 items-start">
+          {/* Main content */}
+          <div className="flex-1 min-w-0">
+            <HoldingsList binderId={id} initial={(holdings ?? []) as Holding[]} />
+          </div>
+
+          {/* Sidebar chart */}
+          <aside className="w-72 shrink-0">
+            <div className="bg-white border rounded-lg px-4 py-4 sticky top-6">
+              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                Value Over Time
+              </h2>
+              <BinderValueChart binderId={id} />
+            </div>
+          </aside>
+        </div>
       </main>
     </div>
   )
