@@ -1,38 +1,36 @@
 import type { Card, CardSearchResult, GameAdapter } from '@/types/card'
 import { getCached, setCached } from '@/lib/cache'
 
-const BASE_URL = 'https://optcgapi.com/api'
-const HEADERS = { 'Accept': 'application/json' }
+const BASE_URL = 'https://api.pokewallet.io'
 const TTL = 60 * 60 * 24 // 24h
+
+function getHeaders(): HeadersInit {
+  const key = process.env.POKEWALLET_API_KEY
+  if (!key) throw new Error('POKEWALLET_API_KEY is not set')
+  return {
+    'X-API-Key': key,
+    'Accept': 'application/json',
+  }
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapCard(raw: any): Card {
   return {
-    id: raw.card_set_id,
+    id: raw.id,
     game: 'onepiece',
-    name: raw.card_name,
+    name: raw.name,
     set_name: raw.set_name ?? '',
-    set_code: raw.set_id ?? '',
-    collector_number: raw.card_set_id ?? '',
-    image_url: raw.card_image ?? null,
+    set_code: raw.card_number?.split('-')[0] ?? '',
+    collector_number: raw.card_number ?? '',
+    image_url: `/api/cards/image?id=${encodeURIComponent(raw.id)}`,
     type_line: raw.card_type ?? null,
     rarity: raw.rarity ?? null,
     price: {
-      usd: raw.market_price ?? null,
+      usd: raw.tcgplayer?.prices?.market_price ?? null,
       usd_foil: null,
-      eur: null,
+      eur: raw.cardmarket?.prices?.avg ?? null,
     },
   }
-}
-
-async function fetchFiltered(endpoint: string, query: string): Promise<Card[]> {
-  const url = `${BASE_URL}/${endpoint}/?card_name=${encodeURIComponent(query)}`
-  const res = await fetch(url, { headers: HEADERS })
-  if (!res.ok) return []
-  const data = await res.json()
-  if (!Array.isArray(data)) return []
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return data.map((c: any) => mapCard(c))
 }
 
 export const optcgAdapter: GameAdapter = {
@@ -41,19 +39,24 @@ export const optcgAdapter: GameAdapter = {
     const cached = await getCached<CardSearchResult>(key)
     if (cached) return cached
 
-    const [sets, decks, promos] = await Promise.all([
-      fetchFiltered('sets/filtered', query),
-      fetchFiltered('decks/filtered', query),
-      fetchFiltered('promos/filtered', query),
-    ])
+    const url = `${BASE_URL}/op/search?q=${encodeURIComponent(query)}&limit=20`
+    const res = await fetch(url, { headers: getHeaders() })
 
-    const seen = new Set<string>()
-    const all = [...sets, ...decks, ...promos].filter((c) => {
-      if (seen.has(c.id)) return false
-      seen.add(c.id)
-      return true
-    })
-    const result: CardSearchResult = { cards: all, total: all.length, has_more: false }
+    if (res.status === 404) {
+      const empty: CardSearchResult = { cards: [], total: 0, has_more: false }
+      await setCached(key, empty, TTL)
+      return empty
+    }
+    if (!res.ok) throw new Error(`One Piece search failed: ${res.status}`)
+
+    const data = await res.json()
+    const cards = Array.isArray(data.data) ? data.data : []
+    const result: CardSearchResult = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      cards: cards.map((c: any) => mapCard(c)),
+      total: data.total ?? cards.length,
+      has_more: (data.page ?? 1) * (data.limit ?? 20) < (data.total ?? 0),
+    }
     await setCached(key, result, TTL)
     return result
   },
@@ -63,18 +66,13 @@ export const optcgAdapter: GameAdapter = {
     const cached = await getCached<Card>(key)
     if (cached) return cached
 
-    const endpoints = ['sets/card', 'decks/card', 'promos/card']
-    for (const ep of endpoints) {
-      const res = await fetch(`${BASE_URL}/${ep}/${id}/`, { headers: HEADERS })
-      if (!res.ok) continue
-      const data = await res.json()
-      const card = Array.isArray(data) ? data[0] : data
-      if (card) {
-        const mapped = mapCard(card)
-        await setCached(key, mapped, TTL)
-        return mapped
-      }
-    }
-    return null
+    const res = await fetch(`${BASE_URL}/op/cards/${encodeURIComponent(id)}`, {
+      headers: getHeaders(),
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    const card = mapCard(data)
+    await setCached(key, card, TTL)
+    return card
   },
 }
