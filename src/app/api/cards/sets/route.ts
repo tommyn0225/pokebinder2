@@ -95,7 +95,9 @@ export async function GET(req: NextRequest) {
     else if (game === 'pokemon') sets = await getPokemonSets()
     else if (game === 'onepiece') sets = await getOnePieceSets()
     else return NextResponse.json({ error: 'Unknown game' }, { status: 400 })
-    return NextResponse.json(sets)
+    return NextResponse.json(sets, {
+      headers: { 'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800' },
+    })
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Failed to load sets' }, { status: 500 })
   }

@@ -45,7 +45,9 @@ export async function GET(req: NextRequest) {
 
   try {
     const result = await adapter.search(q, filters)
-    return NextResponse.json(result)
+    return NextResponse.json(result, {
+      headers: { 'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400' },
+    })
   } catch {
     return NextResponse.json({ error: 'Search failed. Please try again.' }, { status: 500 })
   }

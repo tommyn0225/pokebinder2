@@ -211,7 +211,7 @@ function CardGrid({ cards, binders }: { cards: Card[]; binders: { id: string; na
         <li key={`${card.id}-${i}`} className="bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col">
           <div className="relative">
             {card.image_url ? (
-              <img src={card.image_url} alt={card.name} className="w-full object-cover" />
+              <img src={card.image_url} alt={card.name} loading="lazy" className="w-full object-cover" />
             ) : (
               <div className="aspect-[2.5/3.5] bg-gray-100 flex items-center justify-center text-xs text-gray-400">
                 No image
