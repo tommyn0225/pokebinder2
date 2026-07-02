@@ -1,0 +1,4 @@
+# Supabase CLI local state — not part of the schema, don't commit
+.branches
+.temp
+.env
