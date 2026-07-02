@@ -137,6 +137,7 @@ function AddToBinderButton({ card, binders }: AddToBinderProps) {
   const [open, setOpen] = useState(false)
   const [adding, setAdding] = useState<string | null>(null)
   const [done, setDone]   = useState<string | null>(null)
+  const [failed, setFailed] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -149,23 +150,23 @@ function AddToBinderButton({ card, binders }: AddToBinderProps) {
 
   async function add(binderId: string) {
     setAdding(binderId)
+    setFailed(null)
     try {
-      await fetch(`/api/binders/${binderId}/holdings`, {
+      const res = await fetch(`/api/binders/${binderId}/holdings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           card_id: card.id,
           game: card.game,
           quantity: 1,
-          card_name: card.name,
-          set_name: card.set_name,
-          set_code: card.set_code,
-          collector_number: card.collector_number,
-          image_url: card.image_url,
-          type_line: card.type_line,
-          rarity: card.rarity,
+          card_data: card,
         }),
       })
+      if (!res.ok) {
+        setFailed(binderId)
+        setTimeout(() => setFailed(null), 1800)
+        return
+      }
       setDone(binderId)
       setTimeout(() => { setDone(null); setOpen(false) }, 1200)
     } finally {
@@ -194,6 +195,7 @@ function AddToBinderButton({ card, binders }: AddToBinderProps) {
             >
               <span className="truncate">{b.name}</span>
               {done === b.id   && <span className="text-emerald-500 font-bold ml-1">✓</span>}
+              {failed === b.id && <span className="text-red-500 font-bold ml-1" title="Failed to add">✕</span>}
               {adding === b.id && <span className="text-gray-400 ml-1">…</span>}
             </button>
           ))}
