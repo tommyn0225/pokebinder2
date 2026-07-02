@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 
 export interface BinderHistoryPoint {
   day: string
@@ -28,7 +29,11 @@ export async function GET(
 
   // Get daily binder value: sum(price_usd * current quantity) per day
   // Using current quantity as the best approximation (quantity history not tracked)
-  const { data, error } = await supabase.rpc('binder_value_history', { binder_id_param: id })
+  // price_snapshots has RLS enabled with no policies (service-role only), and
+  // binder_value_history is SECURITY INVOKER, so this must run as the service role.
+  // Ownership of the binder was already verified above with the user-scoped client.
+  const serviceClient = createServiceClient()
+  const { data, error } = await serviceClient.rpc('binder_value_history', { binder_id_param: id })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
