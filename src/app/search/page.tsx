@@ -545,6 +545,12 @@ const GAMES: { value: Game; label: string }[] = [
   { value: 'onepiece', label: 'One Piece' },
 ]
 
+const GAME_SOURCE: Record<Game, { name: string; url: string }> = {
+  mtg:      { name: 'Scryfall',    url: 'https://scryfall.com' },
+  pokemon:  { name: 'PokéWallet',  url: 'https://www.pokewallet.io' },
+  onepiece: { name: 'OPTCG API',   url: 'https://optcgapi.com' },
+}
+
 export default function SearchPage() {
   const [query,       setQuery]       = useState('')
   const [game,        setGame]        = useState<Game>('mtg')
@@ -663,6 +669,18 @@ export default function SearchPage() {
             </button>
           ))}
         </div>
+
+        <p className="text-xs text-gray-400 -mt-3 mb-5">
+          Card data and pricing from{' '}
+          <a
+            href={GAME_SOURCE[game].url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-gray-600"
+          >
+            {GAME_SOURCE[game].name}
+          </a>
+        </p>
 
         {/* Search bar */}
         <form onSubmit={handleSubmit} className="flex gap-2 mb-6">
