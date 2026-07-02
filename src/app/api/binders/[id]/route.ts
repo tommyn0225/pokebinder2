@@ -11,15 +11,26 @@ export async function PATCH(
 
   const { id } = await params
   const body = await request.json()
-  const name = typeof body.name === 'string' ? body.name.trim() : ''
-  if (!name) return NextResponse.json({ error: 'Name is required' }, { status: 400 })
+
+  const update: Record<string, unknown> = {}
+  if (typeof body.name === 'string') {
+    const name = body.name.trim()
+    if (!name) return NextResponse.json({ error: 'Name is required' }, { status: 400 })
+    update.name = name
+  }
+  if (typeof body.is_public === 'boolean') {
+    update.is_public = body.is_public
+  }
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
+  }
 
   const { data, error } = await supabase
     .from('binders')
-    .update({ name })
+    .update(update)
     .eq('id', id)
     .eq('user_id', user.id)
-    .select('id, name, created_at')
+    .select('id, name, created_at, is_public')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -36,7 +47,6 @@ export async function DELETE(
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params
-
   const { error } = await supabase
     .from('binders')
     .delete()

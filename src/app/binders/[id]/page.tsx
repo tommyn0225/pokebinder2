@@ -5,11 +5,7 @@ import HoldingsList from './HoldingsList'
 import BinderValueChart from './BinderValueChart'
 import type { Holding } from '@/types/holding'
 
-export default async function BinderPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
+export default async function BinderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -31,31 +27,29 @@ export default async function BinderPage({
     .order('created_at', { ascending: true })
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-6 py-4 flex items-center gap-4">
-        <Link href="/dashboard" className="text-sm text-gray-500 hover:text-gray-800">
-          &larr; Dashboard
+    <main className="max-w-6xl mx-auto px-6 py-8">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 mb-6 text-sm">
+        <Link href="/dashboard" className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
+          Dashboard
         </Link>
-        <h1 className="text-xl font-bold">{binder.name}</h1>
-      </header>
-      <main className="max-w-6xl mx-auto px-6 py-8">
-        <div className="flex gap-6 items-start">
-          {/* Main content */}
-          <div className="flex-1 min-w-0">
-            <HoldingsList binderId={id} initial={(holdings ?? []) as Holding[]} />
-          </div>
+        <span className="text-slate-300 dark:text-slate-700">/</span>
+        <span className="font-semibold text-slate-900 dark:text-slate-100">{binder.name}</span>
+      </div>
 
-          {/* Sidebar chart */}
-          <aside className="w-72 shrink-0">
-            <div className="bg-white border rounded-lg px-4 py-4 sticky top-6">
-              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                Value Over Time
-              </h2>
-              <BinderValueChart binderId={id} />
-            </div>
-          </aside>
+      <div className="flex gap-6 items-start">
+        <div className="flex-1 min-w-0">
+          <HoldingsList binderId={id} initial={(holdings ?? []) as Holding[]} />
         </div>
-      </main>
-    </div>
+        <aside className="w-72 shrink-0">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-4 sticky top-20">
+            <h2 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">
+              Value Over Time
+            </h2>
+            <BinderValueChart binderId={id} />
+          </div>
+        </aside>
+      </div>
+    </main>
   )
 }

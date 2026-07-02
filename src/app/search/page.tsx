@@ -109,11 +109,11 @@ function SkeletonGrid() {
   return (
     <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
       {Array.from({ length: 15 }).map((_, i) => (
-        <li key={i} className="rounded-xl border bg-white overflow-hidden animate-pulse">
-          <div className="aspect-[2.5/3.5] bg-gray-200" />
+        <li key={i} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden animate-pulse">
+          <div className="aspect-[2.5/3.5] bg-slate-200 dark:bg-slate-800" />
           <div className="p-2 space-y-1.5">
-            <div className="h-3 bg-gray-200 rounded w-3/4" />
-            <div className="h-3 bg-gray-100 rounded w-1/2" />
+            <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-3/4" />
+            <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded w-1/2" />
           </div>
         </li>
       ))}
@@ -123,7 +123,7 @@ function SkeletonGrid() {
 
 function PriceTag({ price }: { price: Card['price'] }) {
   const val = price.usd ?? price.eur
-  if (val == null) return <span className="text-xs text-gray-400">—</span>
+  if (val == null) return <span className="text-xs text-slate-400">—</span>
   const sym = price.usd != null ? '$' : '€'
   return <span className="text-sm font-semibold text-emerald-600">{sym}{val.toFixed(2)}</span>
 }
@@ -180,23 +180,23 @@ function AddToBinderButton({ card, binders }: AddToBinderProps) {
     <div ref={ref} className="relative">
       <button
         onClick={(e) => { e.stopPropagation(); setOpen((o) => !o) }}
-        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium py-1.5 rounded transition-colors"
+        className="w-full bg-violet-600 hover:bg-violet-700 text-white text-xs font-medium py-1.5 rounded transition-colors"
       >
         + Add to binder
       </button>
       {open && (
-        <div className="absolute bottom-full mb-1 left-0 right-0 bg-white border rounded-lg shadow-lg z-20 overflow-hidden">
+        <div className="absolute bottom-full mb-1 left-0 right-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-20 overflow-hidden">
           {binders.map((b) => (
             <button
               key={b.id}
               onClick={(e) => { e.stopPropagation(); add(b.id) }}
               disabled={!!adding}
-              className="w-full text-left text-xs px-3 py-2 hover:bg-indigo-50 flex items-center justify-between disabled:opacity-50"
+              className="w-full text-left text-xs px-3 py-2 hover:bg-violet-50 dark:hover:bg-violet-950 flex items-center justify-between disabled:opacity-50"
             >
               <span className="truncate">{b.name}</span>
               {done === b.id   && <span className="text-emerald-500 font-bold ml-1">✓</span>}
               {failed === b.id && <span className="text-red-500 font-bold ml-1" title="Failed to add">✕</span>}
-              {adding === b.id && <span className="text-gray-400 ml-1">…</span>}
+              {adding === b.id && <span className="text-slate-400 ml-1">…</span>}
             </button>
           ))}
         </div>
@@ -210,20 +210,20 @@ function CardGrid({ cards, binders }: { cards: Card[]; binders: { id: string; na
   return (
     <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
       {cards.map((card, i) => (
-        <li key={`${card.id}-${i}`} className="bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col">
+        <li key={`${card.id}-${i}`} className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col">
           <div className="relative">
             {card.image_url ? (
               <img src={card.image_url} alt={card.name} loading="lazy" className="w-full object-cover" />
             ) : (
-              <div className="aspect-[2.5/3.5] bg-gray-100 flex items-center justify-center text-xs text-gray-400">
+              <div className="aspect-[2.5/3.5] bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs text-slate-400">
                 No image
               </div>
             )}
           </div>
           <div className="p-2 flex flex-col gap-1 flex-1">
-            <p className="text-xs font-semibold leading-tight line-clamp-2 text-gray-900">{card.name}</p>
-            <p className="text-xs text-gray-500 truncate">{card.set_name}</p>
-            {card.type_line && <p className="text-[10px] text-gray-500 truncate">{card.type_line}</p>}
+            <p className="text-xs font-semibold leading-tight line-clamp-2 text-slate-900 dark:text-slate-100">{card.name}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{card.set_name}</p>
+            {card.type_line && <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{card.type_line}</p>}
             <div className="mt-auto pt-1 flex items-center justify-between">
               <PriceTag price={card.price} />
               {card.price.usd_foil != null && (
@@ -279,10 +279,10 @@ function DualRangeSlider({ min = 0, max = PRICE_MAX_SLIDER, valueMin, valueMax, 
     <div>
       <div className="relative h-6 flex items-center">
         {/* Track background */}
-        <div className="absolute w-full h-1.5 bg-gray-200 rounded" />
+        <div className="absolute w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded" />
         {/* Active range */}
         <div
-          className="absolute h-1.5 bg-indigo-500 rounded"
+          className="absolute h-1.5 bg-violet-500 rounded"
           style={{ left: `${loPercent}%`, right: `${100 - hiPercent}%` }}
         />
         {/* Min thumb */}
@@ -298,7 +298,7 @@ function DualRangeSlider({ min = 0, max = PRICE_MAX_SLIDER, valueMin, valueMax, 
           className={thumbCls}
         />
       </div>
-      <div className="flex justify-between text-xs text-gray-600 mt-1.5 font-medium">
+      <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400 mt-1.5 font-medium">
         <span>{lo === min ? 'Any' : `$${lo}`}</span>
         <span>{hi === max ? 'Any' : `$${hi}`}</span>
       </div>
@@ -320,10 +320,10 @@ function FilterSection({ title, defaultOpen = true, children }: FilterSectionPro
     <div className="border-b pb-4 mb-4 last:border-b-0 last:mb-0 last:pb-0">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between text-sm font-semibold text-gray-800 mb-2"
+        className="w-full flex items-center justify-between text-sm font-semibold text-slate-800 dark:text-slate-200 mb-2"
       >
         {title}
-        <span className="text-gray-400 text-xs">{open ? '▲' : '▼'}</span>
+        <span className="text-slate-400 text-xs">{open ? '▲' : '▼'}</span>
       </button>
       {open && children}
     </div>
@@ -357,11 +357,11 @@ function FilterSidebar({ game, filters, sets, setsLoading, onChange, onClear }: 
 
   return (
     <aside className="w-56 shrink-0">
-      <div className="bg-white border rounded-xl p-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Filters</h2>
+          <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wide">Filters</h2>
           {hasAnyFilter && (
-            <button onClick={onClear} className="text-xs text-indigo-600 hover:underline">
+            <button onClick={onClear} className="text-xs text-violet-600 dark:text-violet-400 hover:underline">
               Clear all
             </button>
           )}
@@ -370,12 +370,12 @@ function FilterSidebar({ game, filters, sets, setsLoading, onChange, onClear }: 
         {/* Set */}
         <FilterSection title="Set / Expansion">
           {setsLoading ? (
-            <div className="h-8 bg-gray-100 rounded animate-pulse" />
+            <div className="h-8 bg-slate-100 dark:bg-slate-800 rounded animate-pulse" />
           ) : (
             <select
               value={filters.set}
               onChange={(e) => toggle('set', e.target.value)}
-              className="w-full text-xs text-gray-800 border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              className="w-full text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500"
             >
               <option value="">All sets</option>
               {sets.map((s) => (
@@ -398,8 +398,8 @@ function FilterSidebar({ game, filters, sets, setsLoading, onChange, onClear }: 
                   onClick={() => toggleColor(code)}
                   className={`w-8 h-8 rounded-full border-2 text-xs font-bold transition-all ${
                     filters.colors.includes(code)
-                      ? `${bg} ring-2 ring-indigo-500 ring-offset-1`
-                      : 'bg-gray-50 border-gray-300 text-gray-500 hover:border-gray-400'
+                      ? `${bg} ring-2 ring-violet-500 ring-offset-1`
+                      : 'bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-500 hover:border-slate-400'
                   }`}
                 >
                   {code}
@@ -414,7 +414,7 @@ function FilterSidebar({ game, filters, sets, setsLoading, onChange, onClear }: 
           <FilterSection title="Color">
             <div className="flex flex-col gap-1">
               {OP_COLORS.map((col) => (
-                <label key={col} className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                <label key={col} className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={filters.colors.includes(col)}
@@ -432,7 +432,7 @@ function FilterSidebar({ game, filters, sets, setsLoading, onChange, onClear }: 
         <FilterSection title="Card Type">
           <div className="flex flex-col gap-1">
             {(game === 'mtg' ? MTG_TYPES : game === 'pokemon' ? POKEMON_TYPES : OP_TYPES).map((t) => (
-              <label key={t} className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+              <label key={t} className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
                 <input
                   type="radio"
                   name="type"
@@ -453,7 +453,7 @@ function FilterSidebar({ game, filters, sets, setsLoading, onChange, onClear }: 
               : game === 'pokemon' ? POKEMON_RARITIES.map((r) => ({ value: r, label: r }))
               : OP_RARITIES.map((r) => ({ value: r, label: r }))
             ).map(({ value, label }) => (
-              <label key={value} className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+              <label key={value} className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
                 <input
                   type="radio"
                   name="rarity"
@@ -507,21 +507,21 @@ function Pagination({ page, totalPages, onChange }: PaginationProps) {
       <button
         onClick={() => onChange(page - 1)}
         disabled={page === 1}
-        className="px-3 py-1.5 text-sm rounded-lg border bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+        className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
       >
         ← Prev
       </button>
       {pages.map((p, i) =>
         p === '…' ? (
-          <span key={`ellipsis-${i}`} className="px-2 text-gray-400 text-sm">…</span>
+          <span key={`ellipsis-${i}`} className="px-2 text-slate-400 text-sm">…</span>
         ) : (
           <button
             key={p}
             onClick={() => onChange(p as number)}
             className={`w-9 h-9 text-sm rounded-lg border transition-colors ${
               p === page
-                ? 'bg-indigo-600 text-white border-indigo-600 font-semibold'
-                : 'bg-white text-gray-700 hover:bg-gray-50'
+                ? 'bg-violet-600 text-white border-violet-600 font-semibold'
+                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
             }`}
           >
             {p}
@@ -531,7 +531,7 @@ function Pagination({ page, totalPages, onChange }: PaginationProps) {
       <button
         onClick={() => onChange(page + 1)}
         disabled={page === totalPages}
-        className="px-3 py-1.5 text-sm rounded-lg border bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+        className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
       >
         Next →
       </button>
@@ -645,15 +645,8 @@ export default function SearchPage() {
   const displayCards = allFiltered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-6 py-4 flex items-center gap-4">
-        <Link href="/dashboard" className="text-sm text-gray-500 hover:text-gray-800">
-          ← Dashboard
-        </Link>
-        <h1 className="text-xl font-bold text-gray-900">Search Cards</h1>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-6 py-6">
+    <div className="min-h-screen">
+      <main className="max-w-7xl mx-auto px-6 py-8">
         {/* Game tabs */}
         <div className="flex gap-2 mb-5">
           {GAMES.map((g) => (
@@ -663,8 +656,8 @@ export default function SearchPage() {
               onClick={() => handleGameChange(g.value)}
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
                 game === g.value
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-white border text-gray-600 hover:border-indigo-400 hover:text-indigo-600'
+                  ? 'bg-violet-600 text-white'
+                  : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-violet-400 hover:text-violet-600'
               }`}
             >
               {g.label}
@@ -672,13 +665,13 @@ export default function SearchPage() {
           ))}
         </div>
 
-        <p className="text-xs text-gray-400 -mt-3 mb-5">
+        <p className="text-xs text-slate-400 dark:text-slate-500 -mt-3 mb-5">
           Card data and pricing from{' '}
           <a
             href={GAME_SOURCE[game].url}
             target="_blank"
             rel="noopener noreferrer"
-            className="underline hover:text-gray-600"
+            className="underline hover:text-slate-600 dark:hover:text-slate-300"
           >
             {GAME_SOURCE[game].name}
           </a>
@@ -691,12 +684,12 @@ export default function SearchPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search cards by name…"
-            className="flex-1 border rounded-lg px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            className="flex-1 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
           />
           <button
             type="submit"
             disabled={loading}
-            className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-indigo-700 transition-colors"
+            className="bg-violet-600 hover:bg-violet-700 text-white px-6 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50 transition-colors"
           >
             {loading ? 'Searching…' : 'Search'}
           </button>
@@ -716,28 +709,28 @@ export default function SearchPage() {
           {/* Results */}
           <div className="flex-1 min-w-0">
             {error && (
-              <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">
+              <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-sm text-red-600 dark:text-red-400">
                 {error}
               </div>
             )}
 
             {(result || loading) && (
               <div className="flex items-center justify-between mb-4">
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-slate-600 dark:text-slate-400">
                   {loading ? 'Searching…' : (
                     <>
-                      <span className="font-semibold text-gray-900">{allFiltered.length.toLocaleString()}</span>
+                      <span className="font-semibold text-slate-900 dark:text-slate-100">{allFiltered.length.toLocaleString()}</span>
                       {result && result.total > allFiltered.length && (
-                        <span className="text-gray-500"> of {result.total.toLocaleString()}</span>
+                        <span className="text-slate-500 dark:text-slate-400"> of {result.total.toLocaleString()}</span>
                       )} result{allFiltered.length !== 1 ? 's' : ''}
-                      {result?.has_more && <span className="text-gray-500"> (first page from API)</span>}
+                      {result?.has_more && <span className="text-slate-500 dark:text-slate-400"> (first page from API)</span>}
                     </>
                   )}
                 </p>
                 <select
                   value={sort}
                   onChange={(e) => { setSort(e.target.value as SortKey); setPage(1) }}
-                  className="text-xs text-gray-700 border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  className="text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500"
                 >
                   <option value="name">Name A → Z</option>
                   <option value="price_asc">Price: Low → High</option>
@@ -756,14 +749,14 @@ export default function SearchPage() {
 
             {!loading && result && allFiltered.length === 0 && (
               <div className="text-center py-16">
-                <p className="font-medium text-gray-700">No cards match your filters.</p>
-                <p className="text-sm mt-1 text-gray-500">Try adjusting or clearing your filters.</p>
+                <p className="font-medium text-slate-700 dark:text-slate-300">No cards match your filters.</p>
+                <p className="text-sm mt-1 text-slate-500 dark:text-slate-400">Try adjusting or clearing your filters.</p>
               </div>
             )}
 
             {!loading && !result && !error && (
               <div className="text-center py-16">
-                <p className="font-medium text-gray-700">Search for cards</p>
+                <p className="font-medium text-slate-700 dark:text-slate-300">Search for cards</p>
               </div>
             )}
           </div>

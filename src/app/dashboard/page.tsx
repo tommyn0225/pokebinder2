@@ -1,25 +1,18 @@
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import LogoutButton from './LogoutButton'
 import BinderList from './BinderList'
 import type { Binder } from '@/types/binder'
 import type { Holding } from '@/types/holding'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/login')
-  }
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const [{ data: binders }, { data: holdings }] = await Promise.all([
     supabase
       .from('binders')
-      .select('id, name, created_at')
+      .select('id, name, created_at, is_public')
       .eq('user_id', user.id)
       .order('created_at', { ascending: true }),
     supabase
@@ -36,33 +29,26 @@ export default async function DashboardPage() {
     totalUsd += value
   }
 
-  const bindersWithValue = ((binders ?? []) as Binder[]).map(b => ({
+  const bindersWithValue = ((binders ?? []) as (Binder & { is_public: boolean })[]).map(b => ({
     ...b,
     total_usd: Math.round((binderValueMap.get(b.id) ?? 0) * 100) / 100,
   }))
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-6 py-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold">PokéBinder</h1>
-        <div className="flex items-center gap-4">
-          <Link href="/search" className="text-sm text-indigo-600 hover:underline">
-            Search Cards
-          </Link>
-          <span className="text-sm text-gray-500">{user.email}</span>
-          <LogoutButton />
+    <main className="max-w-3xl mx-auto px-6 py-10">
+      {/* Header row */}
+      <div className="flex items-start justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Your Collection</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{user.email}</p>
         </div>
-      </header>
-      <main className="max-w-2xl mx-auto px-6 py-10">
-        <div className="flex items-baseline justify-between mb-6">
-          <h2 className="text-lg font-semibold text-gray-700">Your Binders</h2>
-          <p className="text-sm text-gray-500">
-            Total collection value:{' '}
-            <span className="font-semibold text-gray-800">${totalUsd.toFixed(2)}</span>
-          </p>
+        <div className="text-right">
+          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide font-medium">Total value</p>
+          <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">${totalUsd.toFixed(2)}</p>
         </div>
-        <BinderList initial={bindersWithValue} />
-      </main>
-    </div>
+      </div>
+
+      <BinderList initial={bindersWithValue} />
+    </main>
   )
 }
