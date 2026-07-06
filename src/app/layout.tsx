@@ -4,6 +4,7 @@ import './globals.css'
 import Footer from './Footer'
 import ThemeProvider, { THEME_INIT_SCRIPT } from '@/components/ThemeProvider'
 import NavbarWrapper from '@/components/NavbarWrapper'
+import ToastProvider from '@/components/Toast'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] })
@@ -21,9 +22,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-full flex flex-col bg-background text-ink">
         <ThemeProvider>
-          <NavbarWrapper />
-          <div className="flex-1">{children}</div>
-          <Footer />
+          <ToastProvider>
+            <NavbarWrapper />
+            <div className="flex-1">{children}</div>
+            <Footer />
+          </ToastProvider>
         </ThemeProvider>
       </body>
     </html>

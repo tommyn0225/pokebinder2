@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import type { Card, CardSearchResult } from '@/types/card'
 import type { SetInfo } from '@/app/api/cards/sets/route'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
+import { useToast } from '@/components/Toast'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -640,7 +641,6 @@ export default function SearchPage() {
   const [filters,     setFilters]     = useState<Filters>(EMPTY_FILTERS)
   const [sort,        setSort]        = useState<SortKey>('name')
   const [result,      setResult]      = useState<CardSearchResult | null>(null)
-  const [error,       setError]       = useState<string | null>(null)
   const [loading,     setLoading]     = useState(false)
   const [sets,        setSets]        = useState<SetInfo[]>([])
   const [setsLoading, setSetsLoading] = useState(false)
@@ -648,6 +648,7 @@ export default function SearchPage() {
   const [page,        setPage]        = useState(1)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [modalCard,   setModalCard]   = useState<Card | null>(null)
+  const toast = useToast()
 
   useEffect(() => {
     fetch('/api/binders')
@@ -685,7 +686,6 @@ export default function SearchPage() {
     if (!q.trim() && !hasFilter) return
 
     setLoading(true)
-    setError(null)
     setPage(1)
     try {
       const params = new URLSearchParams({ game: g })
@@ -700,12 +700,12 @@ export default function SearchPage() {
       if (!res.ok) throw new Error(data.error ?? 'Search failed.')
       setResult(data)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong.')
+      toast(e instanceof Error ? e.message : 'Something went wrong.', 'error')
       setResult(null)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [toast])
 
   // Live search: fire once typing settles (button stays for filter-only searches)
   const debouncedQuery = useDebouncedValue(query)
@@ -731,7 +731,6 @@ export default function SearchPage() {
     setGame(g)
     setFilters(EMPTY_FILTERS)
     setResult(null)
-    setError(null)
     setQuery('')
     setPage(1)
   }
@@ -862,12 +861,6 @@ export default function SearchPage() {
 
           {/* Results */}
           <div className="flex-1 min-w-0">
-            {error && (
-              <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 text-sm text-red-600 dark:text-red-400">
-                {error}
-              </div>
-            )}
-
             {(result || loading) && (
               <div className="flex items-center justify-between mb-4">
                 <p className="text-sm text-muted">
@@ -907,7 +900,7 @@ export default function SearchPage() {
               </div>
             )}
 
-            {!loading && !result && !error && (
+            {!loading && !result && (
               <div className="text-center py-16">
                 <p className="font-medium text-ink">Search for cards</p>
                 <p className="text-sm mt-1 text-muted">Pick a game, type a name, or filter by set to browse.</p>

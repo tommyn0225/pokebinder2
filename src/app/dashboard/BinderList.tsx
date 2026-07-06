@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { Binder } from '@/types/binder'
+import { useToast } from '@/components/Toast'
+import ConfirmDialog from '@/components/ConfirmDialog'
 
 interface BinderWithValue extends Binder {
   total_usd: number
@@ -16,8 +18,9 @@ export default function BinderList({ initial }: { initial: BinderWithValue[] }) 
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
-  const [error, setError]         = useState<string | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<BinderWithValue | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const toast = useToast()
 
   useEffect(() => {
     if (!menuOpenId) return
@@ -40,10 +43,9 @@ export default function BinderList({ initial }: { initial: BinderWithValue[] }) 
     const name = newName.trim()
     if (!name) return
     setCreating(true)
-    setError(null)
     const res  = await fetch('/api/binders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
     const json = await res.json()
-    if (!res.ok) setError(json.error ?? 'Failed to create binder')
+    if (!res.ok) toast(json.error ?? 'Failed to create binder', 'error')
     else { setBinders(prev => [...prev, { ...json, total_usd: 0, is_public: false }]); setNewName('') }
     setCreating(false)
   }
@@ -52,35 +54,34 @@ export default function BinderList({ initial }: { initial: BinderWithValue[] }) 
     e.preventDefault()
     const name = renameValue.trim()
     if (!name) return
-    setError(null)
     const res  = await fetch(`/api/binders/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
     const json = await res.json()
-    if (!res.ok) setError(json.error ?? 'Failed to rename binder')
+    if (!res.ok) toast(json.error ?? 'Failed to rename binder', 'error')
     else { setBinders(prev => prev.map(b => b.id === id ? { ...b, ...json } : b)); setRenamingId(null) }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm('Delete this binder and all its cards?')) return
-    setError(null)
-    const res = await fetch(`/api/binders/${id}`, { method: 'DELETE' })
-    if (!res.ok) setError('Failed to delete binder')
-    else setBinders(prev => prev.filter(b => b.id !== id))
+  async function confirmDelete() {
+    const binder = pendingDelete
+    if (!binder) return
+    setPendingDelete(null)
+    const res = await fetch(`/api/binders/${binder.id}`, { method: 'DELETE' })
+    if (!res.ok) toast('Failed to delete binder', 'error')
+    else {
+      setBinders(prev => prev.filter(b => b.id !== binder.id))
+      toast(`Deleted "${binder.name}"`, 'success')
+    }
   }
 
   async function handleTogglePublic(id: string, current: boolean) {
     const res  = await fetch(`/api/binders/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_public: !current }) })
     const json = await res.json()
-    if (res.ok) setBinders(prev => prev.map(b => b.id === id ? { ...b, ...json } : b))
+    if (!res.ok) { toast('Failed to update binder', 'error'); return }
+    setBinders(prev => prev.map(b => b.id === id ? { ...b, ...json } : b))
+    toast(current ? 'Binder is now private' : 'Binder is now public', 'success')
   }
 
   return (
     <div>
-      {error && (
-        <div className="mb-4 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">
-          {error}
-        </div>
-      )}
-
       {/* Create form */}
       <form onSubmit={handleCreate} className="flex gap-2 mb-6">
         <input
@@ -177,7 +178,7 @@ export default function BinderList({ initial }: { initial: BinderWithValue[] }) 
                           </button>
                           <button
                             role="menuitem"
-                            onClick={() => { setMenuOpenId(null); handleDelete(binder.id) }}
+                            onClick={() => { setMenuOpenId(null); setPendingDelete(binder) }}
                             className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
                           >
                             Delete
@@ -192,6 +193,16 @@ export default function BinderList({ initial }: { initial: BinderWithValue[] }) 
           ))}
         </ul>
       )}
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Delete binder"
+        message={`Delete "${pendingDelete?.name}" and all its cards? This can't be undone.`}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   )
 }

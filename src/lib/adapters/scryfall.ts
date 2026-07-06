@@ -3,7 +3,7 @@ import { getCached, setCached } from '@/lib/cache'
 
 const BASE_URL = 'https://api.scryfall.com'
 const HEADERS = {
-  'User-Agent': 'PokeBinder/1.0 (collection tracker; contact: tommyn0225@gmail.com)',
+  'User-Agent': 'Binder/1.0 (collection tracker; contact: tommyn0225@gmail.com)',
   'Accept': 'application/json',
 }
 const TTL = 60 * 60 * 24 // 24h

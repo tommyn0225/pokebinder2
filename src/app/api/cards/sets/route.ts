@@ -18,7 +18,7 @@ async function getMtgSets(): Promise<SetInfo[]> {
 
   const res = await fetch('https://api.scryfall.com/sets', {
     headers: {
-      'User-Agent': 'PokeBinder/1.0 (collection tracker; contact: tommyn0225@gmail.com)',
+      'User-Agent': 'Binder/1.0 (collection tracker; contact: tommyn0225@gmail.com)',
       'Accept': 'application/json',
     },
   })

@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import type { Holding } from '@/types/holding'
 import type { Card, CardSearchResult } from '@/types/card'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
+import { useToast } from '@/components/Toast'
 
 type GameKey = Card['game']
 
@@ -19,6 +20,29 @@ function priceDisplay(card: Card): string {
   return '—'
 }
 
+function QtyStepper({ quantity, name, onChange }: { quantity: number; name: string; onChange: (q: number) => void }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <button
+        onClick={() => onChange(quantity - 1)}
+        disabled={quantity <= 1}
+        aria-label={`Decrease quantity of ${name}`}
+        className="w-6 h-6 rounded border border-line text-muted hover:text-ink hover:border-ink disabled:opacity-30 text-xs transition-colors"
+      >
+        −
+      </button>
+      <span className="w-7 text-center text-ink">{quantity}</span>
+      <button
+        onClick={() => onChange(quantity + 1)}
+        aria-label={`Increase quantity of ${name}`}
+        className="w-6 h-6 rounded border border-line text-muted hover:text-ink hover:border-ink text-xs transition-colors"
+      >
+        +
+      </button>
+    </div>
+  )
+}
+
 export default function HoldingsList({ binderId, initial }: { binderId: string; initial: Holding[] }) {
   const [holdings, setHoldings] = useState<Holding[]>(initial)
   const [query,     setQuery]   = useState('')
@@ -26,24 +50,23 @@ export default function HoldingsList({ binderId, initial }: { binderId: string; 
   const [results,   setResults] = useState<Card[]>([])
   const [searching, setSearching] = useState(false)
   const [adding,    setAdding]  = useState<string | null>(null)
-  const [error,     setError]   = useState<string | null>(null)
+  const toast = useToast()
 
   const search = useCallback(async (q: string, g: GameKey) => {
     if (q.trim().length < 2) { setResults([]); return }
     setSearching(true)
-    setError(null)
     try {
       const res = await fetch(`/api/cards/search?q=${encodeURIComponent(q)}&game=${g}`)
       const data: CardSearchResult = await res.json()
       if (!res.ok) throw new Error((data as unknown as { error: string }).error ?? 'Search failed')
       setResults(data.cards)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Search failed')
+      toast(e instanceof Error ? e.message : 'Search failed', 'error')
       setResults([])
     } finally {
       setSearching(false)
     }
-  }, [])
+  }, [toast])
 
   // Live search: fire once typing settles or the game changes
   const debouncedQuery = useDebouncedValue(query)
@@ -53,20 +76,20 @@ export default function HoldingsList({ binderId, initial }: { binderId: string; 
 
   async function handleAdd(card: Card) {
     setAdding(card.id)
-    setError(null)
     const res = await fetch(`/api/binders/${binderId}/holdings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ card_id: card.id, game: card.game, quantity: 1, card_data: card }),
     })
     const json = await res.json()
-    if (!res.ok) setError(json.error ?? 'Failed to add card')
+    if (!res.ok) toast(json.error ?? 'Failed to add card', 'error')
     else {
       setHoldings(prev => {
         const idx = prev.findIndex(h => h.card_id === card.id)
         if (idx >= 0) { const next = [...prev]; next[idx] = json; return next }
         return [...prev, json]
       })
+      toast(`Added ${card.name}`, 'success')
     }
     setAdding(null)
   }
@@ -79,14 +102,13 @@ export default function HoldingsList({ binderId, initial }: { binderId: string; 
       body: JSON.stringify({ quantity }),
     })
     const json = await res.json()
-    if (!res.ok) setError(json.error ?? 'Failed to update quantity')
+    if (!res.ok) toast(json.error ?? 'Failed to update quantity', 'error')
     else setHoldings(prev => prev.map(h => h.id === holdingId ? json : h))
   }
 
   async function handleRemove(holdingId: string) {
-    setError(null)
     const res = await fetch(`/api/binders/${binderId}/holdings/${holdingId}`, { method: 'DELETE' })
-    if (!res.ok) setError('Failed to remove card')
+    if (!res.ok) toast('Failed to remove card', 'error')
     else setHoldings(prev => prev.filter(h => h.id !== holdingId))
   }
 
@@ -158,12 +180,6 @@ export default function HoldingsList({ binderId, initial }: { binderId: string; 
           </ul>
         )}
       </div>
-
-      {error && (
-        <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-4 py-3">
-          {error}
-        </div>
-      )}
 
       {/* Holdings table */}
       <div className="rounded-xl border border-line bg-surface overflow-hidden">
