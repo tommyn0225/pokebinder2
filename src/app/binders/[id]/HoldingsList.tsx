@@ -193,7 +193,36 @@ export default function HoldingsList({ binderId, initial }: { binderId: string; 
             No cards yet — search above to add some.
           </p>
         ) : (
-          <table className="w-full text-sm">
+          <>
+          {/* Mobile: card layout */}
+          <ul className="sm:hidden divide-y divide-line">
+            {holdings.map(h => (
+              <li key={h.id} className="p-4 flex gap-3">
+                {h.card_data.image_url && (
+                  <img src={h.card_data.image_url} alt={h.card_data.name} loading="lazy" width={48} height={66} className="w-12 h-16 object-cover rounded shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-ink truncate">{h.card_data.name}</p>
+                  <p className="text-xs text-muted truncate mt-0.5">{h.card_data.set_name}</p>
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <span className="font-mono text-sm text-ink">{priceDisplay(h.card_data)}</span>
+                    <div className="flex items-center gap-3">
+                      <QtyStepper quantity={h.quantity} name={h.card_data.name} onChange={q => handleQuantityChange(h.id, q)} />
+                      <button
+                        onClick={() => handleRemove(h.id)}
+                        className="text-xs text-muted hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          {/* Desktop: table layout */}
+          <table className="hidden sm:table w-full text-sm">
             <thead className="bg-background">
               <tr>
                 <th className="microlabel px-5 py-3 text-left font-normal text-muted">Card</th>
@@ -217,23 +246,8 @@ export default function HoldingsList({ binderId, initial }: { binderId: string; 
                   <td className="px-5 py-3 text-muted">{h.card_data.set_name}</td>
                   <td className="px-5 py-3 text-right text-ink">{priceDisplay(h.card_data)}</td>
                   <td className="px-5 py-3">
-                    <div className="flex items-center justify-center gap-1.5">
-                      <button
-                        onClick={() => handleQuantityChange(h.id, h.quantity - 1)}
-                        disabled={h.quantity <= 1}
-                        aria-label={`Decrease quantity of ${h.card_data.name}`}
-                        className="w-6 h-6 rounded border border-line text-muted hover:text-ink hover:border-ink disabled:opacity-30 text-xs transition-colors"
-                      >
-                        −
-                      </button>
-                      <span className="w-7 text-center text-ink">{h.quantity}</span>
-                      <button
-                        onClick={() => handleQuantityChange(h.id, h.quantity + 1)}
-                        aria-label={`Increase quantity of ${h.card_data.name}`}
-                        className="w-6 h-6 rounded border border-line text-muted hover:text-ink hover:border-ink text-xs transition-colors"
-                      >
-                        +
-                      </button>
+                    <div className="flex justify-center">
+                      <QtyStepper quantity={h.quantity} name={h.card_data.name} onChange={q => handleQuantityChange(h.id, q)} />
                     </div>
                   </td>
                   <td className="px-5 py-3 text-right">
@@ -248,6 +262,7 @@ export default function HoldingsList({ binderId, initial }: { binderId: string; 
               ))}
             </tbody>
           </table>
+          </>
         )}
       </div>
     </div>
