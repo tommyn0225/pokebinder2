@@ -36,6 +36,38 @@ function formatDay(iso: string) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+/* Recharts needs concrete color values, so resolve the CSS tokens at
+   runtime and re-resolve when the .dark class flips. */
+function useChartColors() {
+  const [colors, setColors] = useState({
+    grid: '#e4e4e7',
+    tick: '#71717a',
+    line: '#7c3aed',
+    surface: '#ffffff',
+    ink: '#18181b',
+  })
+
+  useEffect(() => {
+    const el = document.documentElement
+    function read() {
+      const cs = getComputedStyle(el)
+      setColors({
+        grid: cs.getPropertyValue('--line').trim(),
+        tick: cs.getPropertyValue('--muted').trim(),
+        line: cs.getPropertyValue('--brand').trim(),
+        surface: cs.getPropertyValue('--surface').trim(),
+        ink: cs.getPropertyValue('--ink').trim(),
+      })
+    }
+    read()
+    const observer = new MutationObserver(read)
+    observer.observe(el, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [])
+
+  return colors
+}
+
 interface Props {
   binderId: string
 }
@@ -45,6 +77,7 @@ export default function BinderValueChart({ binderId }: Props) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [range, setRange] = useState<Range>('1M')
+  const colors = useChartColors()
 
   useEffect(() => {
     fetch(`/api/snapshots/binder/${binderId}`)
@@ -67,8 +100,8 @@ export default function BinderValueChart({ binderId }: Props) {
       }))
   }, [allData, range])
 
-  if (loading) return <p className="text-sm text-gray-400 py-6 text-center">Loading value history…</p>
-  if (error) return <p className="text-sm text-red-500 py-6 text-center">Could not load history: {error}</p>
+  if (loading) return <p className="text-sm text-muted py-6 text-center">Loading value history…</p>
+  if (error) return <p className="text-sm text-red-600 dark:text-red-400 py-6 text-center">Could not load history: {error}</p>
 
   return (
     <div>
@@ -78,10 +111,10 @@ export default function BinderValueChart({ binderId }: Props) {
             <button
               key={r.key}
               onClick={() => setRange(r.key)}
-              className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+              className={`microlabel px-2 py-1 rounded transition-colors ${
                 range === r.key
-                  ? 'bg-indigo-600 text-white'
-                  : 'text-gray-400 hover:text-gray-700'
+                  ? 'bg-brand text-brand-contrast'
+                  : 'text-muted hover:text-ink'
               }`}
             >
               {r.label}
@@ -91,37 +124,45 @@ export default function BinderValueChart({ binderId }: Props) {
       </div>
 
       {chartData.length === 0 ? (
-        <p className="text-sm text-gray-400 py-6 text-center">
+        <p className="text-sm text-muted py-6 text-center">
           No snapshots in this range yet.
         </p>
       ) : (
         <ResponsiveContainer width="100%" height={180}>
           <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
             <XAxis
               dataKey="day"
-              tick={{ fontSize: 10, fill: '#9ca3af' }}
+              tick={{ fontSize: 10, fill: colors.tick }}
               axisLine={false}
               tickLine={false}
               interval="preserveStartEnd"
             />
             <YAxis
               tickFormatter={v => `$${v}`}
-              tick={{ fontSize: 10, fill: '#9ca3af' }}
+              tick={{ fontSize: 10, fill: colors.tick }}
               axisLine={false}
               tickLine={false}
               width={52}
             />
             <Tooltip
               formatter={(v) => [`$${(v as number).toFixed(2)}`, 'Value']}
-              contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }}
+              contentStyle={{
+                fontSize: 12,
+                borderRadius: 8,
+                border: `1px solid ${colors.grid}`,
+                background: colors.surface,
+                color: colors.ink,
+              }}
+              labelStyle={{ color: colors.ink }}
+              itemStyle={{ color: colors.ink }}
             />
             <Line
               type="monotone"
               dataKey="value"
-              stroke="#6366f1"
+              stroke={colors.line}
               strokeWidth={2}
-              dot={chartData.length === 1 ? { r: 4, fill: '#6366f1' } : false}
+              dot={chartData.length === 1 ? { r: 4, fill: colors.line } : false}
               activeDot={{ r: 4 }}
             />
           </LineChart>

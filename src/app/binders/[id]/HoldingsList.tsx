@@ -1,8 +1,17 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import type { Holding } from '@/types/holding'
 import type { Card, CardSearchResult } from '@/types/card'
+import { useDebouncedValue } from '@/lib/useDebouncedValue'
+
+type GameKey = Card['game']
+
+const GAMES: { key: GameKey; label: string; placeholder: string }[] = [
+  { key: 'mtg',      label: 'MTG',       placeholder: 'Search MTG cards…' },
+  { key: 'pokemon',  label: 'Pokémon',   placeholder: 'Search Pokémon cards…' },
+  { key: 'onepiece', label: 'One Piece', placeholder: 'Search One Piece cards…' },
+]
 
 function priceDisplay(card: Card): string {
   if (card.price.usd != null) return `$${card.price.usd.toFixed(2)}`
@@ -13,17 +22,18 @@ function priceDisplay(card: Card): string {
 export default function HoldingsList({ binderId, initial }: { binderId: string; initial: Holding[] }) {
   const [holdings, setHoldings] = useState<Holding[]>(initial)
   const [query,     setQuery]   = useState('')
+  const [game,      setGame]    = useState<GameKey>('mtg')
   const [results,   setResults] = useState<Card[]>([])
   const [searching, setSearching] = useState(false)
   const [adding,    setAdding]  = useState<string | null>(null)
   const [error,     setError]   = useState<string | null>(null)
 
-  const search = useCallback(async (q: string) => {
+  const search = useCallback(async (q: string, g: GameKey) => {
     if (q.trim().length < 2) { setResults([]); return }
     setSearching(true)
     setError(null)
     try {
-      const res = await fetch(`/api/cards/search?q=${encodeURIComponent(q)}&game=mtg`)
+      const res = await fetch(`/api/cards/search?q=${encodeURIComponent(q)}&game=${g}`)
       const data: CardSearchResult = await res.json()
       if (!res.ok) throw new Error((data as unknown as { error: string }).error ?? 'Search failed')
       setResults(data.cards)
@@ -34,6 +44,12 @@ export default function HoldingsList({ binderId, initial }: { binderId: string; 
       setSearching(false)
     }
   }, [])
+
+  // Live search: fire once typing settles or the game changes
+  const debouncedQuery = useDebouncedValue(query)
+  useEffect(() => {
+    search(debouncedQuery, game)
+  }, [debouncedQuery, game, search])
 
   async function handleAdd(card: Card) {
     setAdding(card.id)
@@ -75,46 +91,65 @@ export default function HoldingsList({ binderId, initial }: { binderId: string; 
   }
 
   const totalValue = holdings.reduce((sum, h) => sum + (h.card_data.price.usd ?? 0) * h.quantity, 0)
+  const placeholder = GAMES.find(g => g.key === game)?.placeholder ?? 'Search cards…'
 
   return (
     <div className="space-y-6">
       {/* Search & add */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
-        <h2 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">
-          Add Cards
-        </h2>
-        <form onSubmit={e => { e.preventDefault(); search(query) }} className="flex gap-2 mb-3">
+      <div className="rounded-xl border border-line bg-surface p-5">
+        <h2 className="microlabel text-muted mb-3">Add cards</h2>
+
+        {/* Game selector */}
+        <div className="mb-3 flex w-fit divide-x divide-line rounded-md border border-line overflow-hidden">
+          {GAMES.map(g => (
+            <button
+              key={g.key}
+              type="button"
+              onClick={() => setGame(g.key)}
+              aria-pressed={game === g.key}
+              className={`microlabel px-3 py-1.5 transition-colors ${
+                game === g.key
+                  ? 'bg-brand text-brand-contrast'
+                  : 'bg-surface text-muted hover:text-ink'
+              }`}
+            >
+              {g.label}
+            </button>
+          ))}
+        </div>
+
+        <form onSubmit={e => { e.preventDefault(); search(query, game) }} className="flex gap-2 mb-3">
           <input
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Search MTG cards…"
-            className="flex-1 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
+            placeholder={placeholder}
+            className="flex-1 rounded-md border border-line bg-surface px-4 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:border-brand"
           />
           <button
             type="submit"
             disabled={searching || query.trim().length < 2}
-            className="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50 transition-colors"
+            className="control-label rounded-md bg-brand hover:bg-brand-hover text-brand-contrast px-4 py-2.5 disabled:opacity-50 transition-colors"
           >
             {searching ? 'Searching…' : 'Search'}
           </button>
         </form>
 
         {results.length > 0 && (
-          <ul className="border border-slate-200 dark:border-slate-700 rounded-xl divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900 max-h-72 overflow-y-auto">
+          <ul className="rounded-md border border-line divide-y divide-line bg-surface max-h-72 overflow-y-auto">
             {results.map(card => (
-              <li key={card.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+              <li key={card.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-background transition-colors">
                 {card.image_url && (
-                  <img src={card.image_url} alt={card.name} loading="lazy" className="w-8 h-11 object-cover rounded" />
+                  <img src={card.image_url} alt={card.name} loading="lazy" width={32} height={44} className="w-8 h-11 object-cover rounded" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{card.name}</p>
-                  <p className="text-xs text-slate-400">{card.set_name} · {priceDisplay(card)}</p>
+                  <p className="text-sm font-medium text-ink truncate">{card.name}</p>
+                  <p className="text-xs text-muted">{card.set_name} · {priceDisplay(card)}</p>
                 </div>
                 <button
                   onClick={() => handleAdd(card)}
                   disabled={adding === card.id}
-                  className="text-xs bg-violet-50 dark:bg-violet-950 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800 px-3 py-1 rounded-full hover:bg-violet-100 dark:hover:bg-violet-900 disabled:opacity-50 transition-colors shrink-0"
+                  className="microlabel shrink-0 rounded-md border border-line px-3 py-1.5 text-ink hover:border-brand hover:text-brand disabled:opacity-50 transition-colors"
                 >
                   {adding === card.id ? 'Adding…' : '+ Add'}
                 </button>
@@ -125,65 +160,61 @@ export default function HoldingsList({ binderId, initial }: { binderId: string; 
       </div>
 
       {error && (
-        <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3">
+        <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-4 py-3">
           {error}
         </div>
       )}
 
       {/* Holdings table */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
-          <h2 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-            Cards in this binder
-          </h2>
-          <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-            ${totalValue.toFixed(2)}
-          </span>
+      <div className="rounded-xl border border-line bg-surface overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-line">
+          <h2 className="microlabel text-muted">Cards in this binder</h2>
+          <span className="text-sm font-semibold text-ink">${totalValue.toFixed(2)}</span>
         </div>
 
         {holdings.length === 0 ? (
-          <p className="text-center text-slate-400 dark:text-slate-600 py-12 text-sm">
+          <p className="text-center text-muted py-12 text-sm">
             No cards yet — search above to add some.
           </p>
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wide">
+            <thead className="bg-background">
               <tr>
-                <th className="px-5 py-3 text-left">Card</th>
-                <th className="px-5 py-3 text-left">Set</th>
-                <th className="px-5 py-3 text-right">Price</th>
-                <th className="px-5 py-3 text-center">Qty</th>
+                <th className="microlabel px-5 py-3 text-left font-normal text-muted">Card</th>
+                <th className="microlabel px-5 py-3 text-left font-normal text-muted">Set</th>
+                <th className="microlabel px-5 py-3 text-right font-normal text-muted">Price</th>
+                <th className="microlabel px-5 py-3 text-center font-normal text-muted">Qty</th>
                 <th className="px-5 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-line">
               {holdings.map(h => (
-                <tr key={h.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                <tr key={h.id} className="hover:bg-background transition-colors">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">
                       {h.card_data.image_url && (
-                        <img src={h.card_data.image_url} alt={h.card_data.name} loading="lazy" className="w-8 h-11 object-cover rounded" />
+                        <img src={h.card_data.image_url} alt={h.card_data.name} loading="lazy" width={32} height={44} className="w-8 h-11 object-cover rounded" />
                       )}
-                      <span className="font-medium text-slate-900 dark:text-slate-100">{h.card_data.name}</span>
+                      <span className="font-medium text-ink">{h.card_data.name}</span>
                     </div>
                   </td>
-                  <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{h.card_data.set_name}</td>
-                  <td className="px-5 py-3 text-right font-semibold text-emerald-600 dark:text-emerald-400">
-                    {priceDisplay(h.card_data)}
-                  </td>
+                  <td className="px-5 py-3 text-muted">{h.card_data.set_name}</td>
+                  <td className="px-5 py-3 text-right text-ink">{priceDisplay(h.card_data)}</td>
                   <td className="px-5 py-3">
                     <div className="flex items-center justify-center gap-1.5">
                       <button
                         onClick={() => handleQuantityChange(h.id, h.quantity - 1)}
                         disabled={h.quantity <= 1}
-                        className="w-6 h-6 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 text-xs font-bold transition-colors"
+                        aria-label={`Decrease quantity of ${h.card_data.name}`}
+                        className="w-6 h-6 rounded border border-line text-muted hover:text-ink hover:border-ink disabled:opacity-30 text-xs transition-colors"
                       >
                         −
                       </button>
-                      <span className="w-7 text-center text-slate-900 dark:text-slate-100">{h.quantity}</span>
+                      <span className="w-7 text-center text-ink">{h.quantity}</span>
                       <button
                         onClick={() => handleQuantityChange(h.id, h.quantity + 1)}
-                        className="w-6 h-6 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-bold transition-colors"
+                        aria-label={`Increase quantity of ${h.card_data.name}`}
+                        className="w-6 h-6 rounded border border-line text-muted hover:text-ink hover:border-ink text-xs transition-colors"
                       >
                         +
                       </button>
@@ -192,7 +223,7 @@ export default function HoldingsList({ binderId, initial }: { binderId: string; 
                   <td className="px-5 py-3 text-right">
                     <button
                       onClick={() => handleRemove(h.id)}
-                      className="text-xs text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                      className="text-xs text-muted hover:text-red-600 dark:hover:text-red-400 transition-colors"
                     >
                       Remove
                     </button>

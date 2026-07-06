@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { Binder } from '@/types/binder'
 
@@ -15,7 +15,25 @@ export default function BinderList({ initial }: { initial: BinderWithValue[] }) 
   const [creating, setCreating]   = useState(false)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const [error, setError]         = useState<string | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!menuOpenId) return
+    function onMouseDown(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpenId(null)
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setMenuOpenId(null)
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [menuOpenId])
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -58,7 +76,7 @@ export default function BinderList({ initial }: { initial: BinderWithValue[] }) 
   return (
     <div>
       {error && (
-        <div className="mb-4 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
+        <div className="mb-4 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">
           {error}
         </div>
       )}
@@ -70,31 +88,27 @@ export default function BinderList({ initial }: { initial: BinderWithValue[] }) 
           value={newName}
           onChange={e => setNewName(e.target.value)}
           placeholder="New binder name…"
-          className="flex-1 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
+          className="flex-1 rounded-md border border-line bg-surface px-4 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:border-brand"
         />
         <button
           type="submit"
           disabled={creating || !newName.trim()}
-          className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50 transition-colors"
+          className="control-label rounded-md bg-brand hover:bg-brand-hover text-brand-contrast px-5 py-2.5 disabled:opacity-50 transition-colors"
         >
-          {creating ? 'Creating…' : 'New Binder'}
+          {creating ? 'Creating…' : 'New binder'}
         </button>
       </form>
 
       {/* Binder list */}
       {binders.length === 0 ? (
-        <div className="text-center py-16 text-slate-400 dark:text-slate-600">
-          <p className="text-4xl mb-3">📂</p>
-          <p className="font-medium text-slate-600 dark:text-slate-400">No binders yet</p>
-          <p className="text-sm mt-1">Create one above to start tracking your collection.</p>
+        <div className="rounded-xl border border-line bg-surface text-center py-16">
+          <p className="font-semibold text-ink">No binders yet</p>
+          <p className="text-sm text-muted mt-1">Create one above to start tracking your collection.</p>
         </div>
       ) : (
-        <ul className="space-y-3">
+        <ul className="rounded-xl border border-line bg-surface divide-y divide-line">
           {binders.map(binder => (
-            <li
-              key={binder.id}
-              className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-5 py-4 flex items-center justify-between gap-4 hover:border-violet-300 dark:hover:border-violet-700 transition-colors"
-            >
+            <li key={binder.id} className="px-5 py-4 flex items-center justify-between gap-4">
               {renamingId === binder.id ? (
                 <form onSubmit={e => handleRename(e, binder.id)} className="flex gap-2 flex-1">
                   <input
@@ -102,50 +116,74 @@ export default function BinderList({ initial }: { initial: BinderWithValue[] }) 
                     type="text"
                     value={renameValue}
                     onChange={e => setRenameValue(e.target.value)}
-                    className="flex-1 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    className="flex-1 rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:outline-none focus:border-brand"
                   />
-                  <button type="submit" className="text-sm text-violet-600 dark:text-violet-400 font-semibold hover:underline">Save</button>
-                  <button type="button" onClick={() => setRenamingId(null)} className="text-sm text-slate-400 hover:underline">Cancel</button>
+                  <button type="submit" className="text-sm font-semibold text-brand hover:underline">Save</button>
+                  <button type="button" onClick={() => setRenamingId(null)} className="text-sm text-muted hover:underline">Cancel</button>
                 </form>
               ) : (
                 <>
                   <div className="flex items-center gap-3 min-w-0">
                     <Link
                       href={`/binders/${binder.id}`}
-                      className="font-semibold text-slate-900 dark:text-slate-100 hover:text-violet-600 dark:hover:text-violet-400 transition-colors truncate"
+                      className="font-semibold text-ink hover:text-brand transition-colors truncate"
                     >
                       {binder.name}
                     </Link>
-                    {binder.is_public && (
-                      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300">
+                    {binder.is_public ? (
+                      <span className="microlabel shrink-0 rounded border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 px-2 py-0.5">
                         Public
+                      </span>
+                    ) : (
+                      <span className="microlabel shrink-0 rounded border border-line text-muted px-2 py-0.5">
+                        Private
                       </span>
                     )}
                   </div>
 
-                  <div className="flex items-center gap-4 text-sm shrink-0">
-                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                  <div className="flex items-center gap-4 shrink-0">
+                    <span className="font-mono text-sm text-ink">
                       ${binder.total_usd.toFixed(2)}
                     </span>
-                    <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="relative" ref={menuOpenId === binder.id ? menuRef : undefined}>
                       <button
-                        onClick={() => handleTogglePublic(binder.id, binder.is_public)}
-                        className="text-slate-500 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors text-xs"
+                        onClick={() => setMenuOpenId(menuOpenId === binder.id ? null : binder.id)}
+                        aria-label={`Actions for ${binder.name}`}
+                        aria-haspopup="menu"
+                        aria-expanded={menuOpenId === binder.id}
+                        className="w-8 h-8 rounded-md border border-line flex items-center justify-center text-muted hover:text-ink hover:border-ink transition-colors"
                       >
-                        {binder.is_public ? 'Make private' : 'Make public'}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                          <circle cx="5" cy="12" r="1.5" />
+                          <circle cx="12" cy="12" r="1.5" />
+                          <circle cx="19" cy="12" r="1.5" />
+                        </svg>
                       </button>
-                      <button
-                        onClick={() => { setRenamingId(binder.id); setRenameValue(binder.name) }}
-                        className="text-slate-500 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
-                      >
-                        Rename
-                      </button>
-                      <button
-                        onClick={() => handleDelete(binder.id)}
-                        className="text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                      >
-                        Delete
-                      </button>
+                      {menuOpenId === binder.id && (
+                        <div role="menu" className="absolute right-0 top-full mt-1 w-44 rounded-lg border border-line bg-surface py-1 shadow-md z-10">
+                          <button
+                            role="menuitem"
+                            onClick={() => { setMenuOpenId(null); setRenamingId(binder.id); setRenameValue(binder.name) }}
+                            className="w-full text-left px-3 py-2 text-sm text-ink hover:bg-background transition-colors"
+                          >
+                            Rename
+                          </button>
+                          <button
+                            role="menuitem"
+                            onClick={() => { setMenuOpenId(null); handleTogglePublic(binder.id, binder.is_public) }}
+                            className="w-full text-left px-3 py-2 text-sm text-ink hover:bg-background transition-colors"
+                          >
+                            {binder.is_public ? 'Make private' : 'Make public'}
+                          </button>
+                          <button
+                            role="menuitem"
+                            onClick={() => { setMenuOpenId(null); handleDelete(binder.id) }}
+                            className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </>

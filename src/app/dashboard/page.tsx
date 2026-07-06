@@ -36,15 +36,21 @@ export default async function DashboardPage() {
 
   return (
     <main className="max-w-3xl mx-auto px-6 py-10">
-      {/* Header row */}
-      <div className="flex items-start justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Your Collection</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{user.email}</p>
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight text-ink">Your Collection</h1>
+        <p className="text-sm text-muted mt-0.5">{user.email}</p>
+      </div>
+
+      {/* Stat panel */}
+      <div className="mb-6 grid grid-cols-2 divide-x divide-line rounded-xl border border-line bg-surface">
+        <div className="px-5 py-4">
+          <p className="microlabel text-muted">Total value</p>
+          <p className="mt-1 font-mono text-2xl text-ink">${totalUsd.toFixed(2)}</p>
         </div>
-        <div className="text-right">
-          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide font-medium">Total value</p>
-          <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">${totalUsd.toFixed(2)}</p>
+        <div className="px-5 py-4">
+          <p className="microlabel text-muted">Binders</p>
+          <p className="mt-1 font-mono text-2xl text-ink">{String(bindersWithValue.length).padStart(2, '0')}</p>
         </div>
       </div>
 
