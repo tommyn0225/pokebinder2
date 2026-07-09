@@ -3,16 +3,18 @@
 import { useState, useCallback, useEffect } from 'react'
 import type { Holding } from '@/types/holding'
 import type { Card, CardSearchResult } from '@/types/card'
+import type { Binder } from '@/types/binder'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
 import { useToast } from '@/components/Toast'
 
-type GameKey = Card['game']
+type GameKey = Binder['game']
+type ViewMode = 'list' | 'grid'
 
-const GAMES: { key: GameKey; label: string; placeholder: string }[] = [
-  { key: 'mtg',      label: 'MTG',       placeholder: 'Search MTG cards…' },
-  { key: 'pokemon',  label: 'Pokémon',   placeholder: 'Search Pokémon cards…' },
-  { key: 'onepiece', label: 'One Piece', placeholder: 'Search One Piece cards…' },
-]
+const PLACEHOLDERS: Record<GameKey, string> = {
+  mtg: 'Search MTG cards…',
+  pokemon: 'Search Pokémon cards…',
+  onepiece: 'Search One Piece cards…',
+}
 
 function priceDisplay(card: Card): string {
   if (card.price.usd != null) return `$${card.price.usd.toFixed(2)}`
@@ -43,20 +45,38 @@ function QtyStepper({ quantity, name, onChange }: { quantity: number; name: stri
   )
 }
 
-export default function HoldingsList({ binderId, initial }: { binderId: string; initial: Holding[] }) {
+function TradeToggle({ on, name, onClick }: { on: boolean; name: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={on}
+      aria-label={`Mark ${name} ${on ? 'not for trade' : 'for trade'}`}
+      className={`microlabel rounded border px-2 py-0.5 transition-colors ${
+        on
+          ? 'border-blue-300 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400'
+          : 'border-line text-muted hover:text-ink hover:border-ink'
+      }`}
+    >
+      {on ? '✓ For trade' : 'For trade'}
+    </button>
+  )
+}
+
+export default function HoldingsList({ binderId, binderGame, initial }: { binderId: string; binderGame: GameKey; initial: Holding[] }) {
   const [holdings, setHoldings] = useState<Holding[]>(initial)
   const [query,     setQuery]   = useState('')
-  const [game,      setGame]    = useState<GameKey>('mtg')
   const [results,   setResults] = useState<Card[]>([])
   const [searching, setSearching] = useState(false)
   const [adding,    setAdding]  = useState<string | null>(null)
+  const [addOpen,   setAddOpen] = useState(true)
+  const [view,      setView]    = useState<ViewMode>('list')
   const toast = useToast()
 
-  const search = useCallback(async (q: string, g: GameKey) => {
+  const search = useCallback(async (q: string) => {
     if (q.trim().length < 2) { setResults([]); return }
     setSearching(true)
     try {
-      const res = await fetch(`/api/cards/search?q=${encodeURIComponent(q)}&game=${g}`)
+      const res = await fetch(`/api/cards/search?q=${encodeURIComponent(q)}&game=${binderGame}`)
       const data: CardSearchResult = await res.json()
       if (!res.ok) throw new Error((data as unknown as { error: string }).error ?? 'Search failed')
       setResults(data.cards)
@@ -66,13 +86,13 @@ export default function HoldingsList({ binderId, initial }: { binderId: string; 
     } finally {
       setSearching(false)
     }
-  }, [toast])
+  }, [toast, binderGame])
 
-  // Live search: fire once typing settles or the game changes
+  // Live search: fire once typing settles
   const debouncedQuery = useDebouncedValue(query)
   useEffect(() => {
-    search(debouncedQuery, game)
-  }, [debouncedQuery, game, search])
+    search(debouncedQuery)
+  }, [debouncedQuery, search])
 
   async function handleAdd(card: Card) {
     setAdding(card.id)
@@ -106,6 +126,17 @@ export default function HoldingsList({ binderId, initial }: { binderId: string; 
     else setHoldings(prev => prev.map(h => h.id === holdingId ? json : h))
   }
 
+  async function handleToggleTrade(holdingId: string, current: boolean) {
+    const res = await fetch(`/api/binders/${binderId}/holdings/${holdingId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ for_trade: !current }),
+    })
+    const json = await res.json()
+    if (!res.ok) toast(json.error ?? 'Failed to update trade status', 'error')
+    else setHoldings(prev => prev.map(h => h.id === holdingId ? json : h))
+  }
+
   async function handleRemove(holdingId: string) {
     const res = await fetch(`/api/binders/${binderId}/holdings/${holdingId}`, { method: 'DELETE' })
     if (!res.ok) toast('Failed to remove card', 'error')
@@ -113,86 +144,140 @@ export default function HoldingsList({ binderId, initial }: { binderId: string; 
   }
 
   const totalValue = holdings.reduce((sum, h) => sum + (h.card_data.price.usd ?? 0) * h.quantity, 0)
-  const placeholder = GAMES.find(g => g.key === game)?.placeholder ?? 'Search cards…'
+  const placeholder = PLACEHOLDERS[binderGame] ?? 'Search cards…'
 
   return (
     <div className="space-y-6">
       {/* Search & add */}
       <div className="rounded-xl border border-line bg-surface p-5">
-        <h2 className="microlabel text-muted mb-3">Add cards</h2>
-
-        {/* Game selector */}
-        <div className="mb-3 flex w-fit divide-x divide-line rounded-md border border-line overflow-hidden">
-          {GAMES.map(g => (
-            <button
-              key={g.key}
-              type="button"
-              onClick={() => setGame(g.key)}
-              aria-pressed={game === g.key}
-              className={`microlabel px-3 py-1.5 transition-colors ${
-                game === g.key
-                  ? 'bg-brand text-brand-contrast'
-                  : 'bg-surface text-muted hover:text-ink'
-              }`}
-            >
-              {g.label}
-            </button>
-          ))}
+        <div className="flex items-center justify-between">
+          <h2 className="microlabel text-muted">Add cards</h2>
+          <button
+            type="button"
+            onClick={() => setAddOpen(o => !o)}
+            aria-expanded={addOpen}
+            className="microlabel flex items-center gap-1 text-muted hover:text-ink transition-colors"
+          >
+            {addOpen ? 'Minimize' : 'Expand'}
+            <span className="text-[9px]">{addOpen ? '▲' : '▼'}</span>
+          </button>
         </div>
 
-        <form onSubmit={e => { e.preventDefault(); search(query, game) }} className="flex gap-2 mb-3">
-          <input
-            type="text"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder={placeholder}
-            className="flex-1 rounded-md border border-line bg-surface px-4 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:border-brand"
-          />
-          <button
-            type="submit"
-            disabled={searching || query.trim().length < 2}
-            className="control-label rounded-md bg-brand hover:bg-brand-hover text-brand-contrast px-4 py-2.5 disabled:opacity-50 transition-colors"
-          >
-            {searching ? 'Searching…' : 'Search'}
-          </button>
-        </form>
+        {addOpen && (
+          <div className="mt-3">
+            <form onSubmit={e => { e.preventDefault(); search(query) }} className="flex gap-2 mb-3">
+              <input
+                type="text"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder={placeholder}
+                className="flex-1 rounded-md border border-line bg-surface px-4 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:border-brand"
+              />
+              <button
+                type="submit"
+                disabled={searching || query.trim().length < 2}
+                className="control-label rounded-md bg-brand hover:bg-brand-hover text-brand-contrast px-4 py-2.5 disabled:opacity-50 transition-colors"
+              >
+                {searching ? 'Searching…' : 'Search'}
+              </button>
+            </form>
 
-        {results.length > 0 && (
-          <ul className="rounded-md border border-line divide-y divide-line bg-surface max-h-72 overflow-y-auto">
-            {results.map(card => (
-              <li key={card.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-background transition-colors">
-                {card.image_url && (
-                  <img src={card.image_url} alt={card.name} loading="lazy" width={32} height={44} className="w-8 h-11 object-cover rounded" />
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-ink truncate">{card.name}</p>
-                  <p className="text-xs text-muted">{card.set_name} · {priceDisplay(card)}</p>
-                </div>
-                <button
-                  onClick={() => handleAdd(card)}
-                  disabled={adding === card.id}
-                  className="microlabel shrink-0 rounded-md border border-line px-3 py-1.5 text-ink hover:border-brand hover:text-brand disabled:opacity-50 transition-colors"
-                >
-                  {adding === card.id ? 'Adding…' : '+ Add'}
-                </button>
-              </li>
-            ))}
-          </ul>
+            {results.length > 0 && (
+              <ul className="rounded-md border border-line divide-y divide-line bg-surface max-h-72 overflow-y-auto">
+                {results.map(card => (
+                  <li key={card.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-background transition-colors">
+                    {card.image_url && (
+                      <img src={card.image_url} alt={card.name} loading="lazy" width={32} height={44} className="w-8 h-11 object-cover rounded" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-ink truncate">{card.name}</p>
+                      <p className="text-xs text-muted">{card.set_name} · {priceDisplay(card)}</p>
+                    </div>
+                    <button
+                      onClick={() => handleAdd(card)}
+                      disabled={adding === card.id}
+                      className="microlabel shrink-0 rounded-md border border-line px-3 py-1.5 text-ink hover:border-brand hover:text-brand disabled:opacity-50 transition-colors"
+                    >
+                      {adding === card.id ? 'Adding…' : '+ Add'}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
       </div>
 
-      {/* Holdings table */}
+      {/* Holdings */}
       <div className="rounded-xl border border-line bg-surface overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-line">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-line gap-3">
           <h2 className="microlabel text-muted">Cards in this binder</h2>
-          <span className="text-sm font-semibold text-ink">${totalValue.toFixed(2)}</span>
+          <div className="flex items-center gap-4">
+            {/* View toggle */}
+            <div className="flex divide-x divide-line rounded-md border border-line overflow-hidden">
+              {(['list', 'grid'] as ViewMode[]).map(v => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setView(v)}
+                  aria-pressed={view === v}
+                  className={`microlabel px-3 py-1 transition-colors ${
+                    view === v ? 'bg-brand text-brand-contrast' : 'bg-surface text-muted hover:text-ink'
+                  }`}
+                >
+                  {v === 'list' ? 'List' : 'Grid'}
+                </button>
+              ))}
+            </div>
+            <span className="text-sm font-semibold text-ink">${totalValue.toFixed(2)}</span>
+          </div>
         </div>
 
         {holdings.length === 0 ? (
           <p className="text-center text-muted py-12 text-sm">
             No cards yet — search above to add some.
           </p>
+        ) : view === 'grid' ? (
+          /* Grid view */
+          <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 p-5">
+            {holdings.map(h => (
+              <li key={h.id} className="bg-surface rounded-xl border border-line overflow-hidden flex flex-col">
+                <div className="relative">
+                  {h.card_data.image_url ? (
+                    <img src={h.card_data.image_url} alt={h.card_data.name} loading="lazy" width={250} height={350} className="w-full h-auto object-cover" />
+                  ) : (
+                    <div className="aspect-[2.5/3.5] bg-background flex items-center justify-center text-xs text-muted">
+                      No image
+                    </div>
+                  )}
+                  {h.for_trade && (
+                    <span className="absolute top-1 left-1 microlabel rounded bg-blue-600 text-white px-1.5 py-0.5">
+                      For trade
+                    </span>
+                  )}
+                </div>
+                <div className="p-2 flex flex-col gap-1.5 flex-1">
+                  <p className="text-xs font-semibold leading-tight line-clamp-2 text-ink">{h.card_data.name}</p>
+                  <p className="text-xs text-muted truncate">{h.card_data.set_name}</p>
+                  <div className="mt-auto pt-1 flex items-center justify-between">
+                    <span className="font-mono text-sm text-ink">{priceDisplay(h.card_data)}</span>
+                    <QtyStepper quantity={h.quantity} name={h.card_data.name} onChange={q => handleQuantityChange(h.id, q)} />
+                  </div>
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <TradeToggle on={h.for_trade} name={h.card_data.name} onClick={() => handleToggleTrade(h.id, h.for_trade)} />
+                    <button
+                      onClick={() => handleRemove(h.id)}
+                      className="text-xs text-muted hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
         ) : (
+          /* List view (default) */
           <>
           {/* Mobile: card layout */}
           <ul className="sm:hidden divide-y divide-line">
@@ -206,15 +291,16 @@ export default function HoldingsList({ binderId, initial }: { binderId: string; 
                   <p className="text-xs text-muted truncate mt-0.5">{h.card_data.set_name}</p>
                   <div className="mt-2 flex items-center justify-between gap-2">
                     <span className="font-mono text-sm text-ink">{priceDisplay(h.card_data)}</span>
-                    <div className="flex items-center gap-3">
-                      <QtyStepper quantity={h.quantity} name={h.card_data.name} onChange={q => handleQuantityChange(h.id, q)} />
-                      <button
-                        onClick={() => handleRemove(h.id)}
-                        className="text-xs text-muted hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                      >
-                        Remove
-                      </button>
-                    </div>
+                    <QtyStepper quantity={h.quantity} name={h.card_data.name} onChange={q => handleQuantityChange(h.id, q)} />
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <TradeToggle on={h.for_trade} name={h.card_data.name} onClick={() => handleToggleTrade(h.id, h.for_trade)} />
+                    <button
+                      onClick={() => handleRemove(h.id)}
+                      className="text-xs text-muted hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                    >
+                      Remove
+                    </button>
                   </div>
                 </div>
               </li>
@@ -229,6 +315,7 @@ export default function HoldingsList({ binderId, initial }: { binderId: string; 
                 <th className="microlabel px-5 py-3 text-left font-normal text-muted">Set</th>
                 <th className="microlabel px-5 py-3 text-right font-normal text-muted">Price</th>
                 <th className="microlabel px-5 py-3 text-center font-normal text-muted">Qty</th>
+                <th className="microlabel px-5 py-3 text-center font-normal text-muted">Trade</th>
                 <th className="px-5 py-3" />
               </tr>
             </thead>
@@ -248,6 +335,11 @@ export default function HoldingsList({ binderId, initial }: { binderId: string; 
                   <td className="px-5 py-3">
                     <div className="flex justify-center">
                       <QtyStepper quantity={h.quantity} name={h.card_data.name} onChange={q => handleQuantityChange(h.id, q)} />
+                    </div>
+                  </td>
+                  <td className="px-5 py-3">
+                    <div className="flex justify-center">
+                      <TradeToggle on={h.for_trade} name={h.card_data.name} onClick={() => handleToggleTrade(h.id, h.for_trade)} />
                     </div>
                   </td>
                   <td className="px-5 py-3 text-right">

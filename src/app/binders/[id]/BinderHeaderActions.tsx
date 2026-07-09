@@ -1,15 +1,18 @@
 'use client'
 
 import { useState } from 'react'
+import ShareDialog from '@/components/ShareDialog'
 
-interface BinderVisibilityToggleProps {
+interface BinderHeaderActionsProps {
   binderId: string
+  binderName: string
   initialIsPublic: boolean
 }
 
-export default function BinderVisibilityToggle({ binderId, initialIsPublic }: BinderVisibilityToggleProps) {
+export default function BinderHeaderActions({ binderId, binderName, initialIsPublic }: BinderHeaderActionsProps) {
   const [isPublic, setIsPublic] = useState(initialIsPublic)
   const [saving, setSaving] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
 
   async function handleToggle() {
     setSaving(true)
@@ -43,6 +46,22 @@ export default function BinderVisibilityToggle({ binderId, initialIsPublic }: Bi
       >
         {saving ? 'Saving…' : isPublic ? 'Make private' : 'Make public'}
       </button>
+      <button
+        onClick={() => setShareOpen(true)}
+        className="microlabel rounded-md border border-line px-3 py-1 text-ink hover:border-brand hover:text-brand transition-colors"
+      >
+        Share
+      </button>
+
+      {shareOpen && (
+        <ShareDialog
+          title={`Share “${binderName}”`}
+          path={`/b/${binderId}`}
+          isPublic={isPublic}
+          privateNote="This binder is private. The link won’t open for anyone until you make the binder public."
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </div>
   )
 }

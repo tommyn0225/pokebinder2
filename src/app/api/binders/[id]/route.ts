@@ -30,7 +30,7 @@ export async function PATCH(
     .update(update)
     .eq('id', id)
     .eq('user_id', user.id)
-    .select('id, name, created_at, is_public')
+    .select('id, name, game, created_at, is_public')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

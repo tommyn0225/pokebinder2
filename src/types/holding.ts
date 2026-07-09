@@ -7,6 +7,7 @@ export interface Holding {
   card_id: string
   game: string
   quantity: number
+  for_trade: boolean
   card_data: Card
   created_at: string
 }

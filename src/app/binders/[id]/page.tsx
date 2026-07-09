@@ -3,7 +3,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import HoldingsList from './HoldingsList'
 import BinderValueChart from './BinderValueChart'
-import BinderVisibilityToggle from './BinderVisibilityToggle'
+import BinderHeaderActions from './BinderHeaderActions'
+import type { Binder } from '@/types/binder'
 import type { Holding } from '@/types/holding'
 
 export default async function BinderPage({ params }: { params: Promise<{ id: string }> }) {
@@ -14,7 +15,7 @@ export default async function BinderPage({ params }: { params: Promise<{ id: str
 
   const { data: binder } = await supabase
     .from('binders')
-    .select('id, name, is_public')
+    .select('id, name, game, is_public')
     .eq('id', id)
     .eq('user_id', user.id)
     .single()
@@ -23,7 +24,7 @@ export default async function BinderPage({ params }: { params: Promise<{ id: str
 
   const { data: holdings } = await supabase
     .from('holdings')
-    .select('id, binder_id, user_id, card_id, game, quantity, card_data, created_at')
+    .select('id, binder_id, user_id, card_id, game, quantity, for_trade, card_data, created_at')
     .eq('binder_id', id)
     .order('created_at', { ascending: true })
 
@@ -37,13 +38,13 @@ export default async function BinderPage({ params }: { params: Promise<{ id: str
         <span className="text-muted">/</span>
         <span className="font-semibold text-ink">{binder.name}</span>
         <div className="ml-auto">
-          <BinderVisibilityToggle binderId={binder.id} initialIsPublic={binder.is_public} />
+          <BinderHeaderActions binderId={binder.id} binderName={binder.name} initialIsPublic={binder.is_public} />
         </div>
       </div>
 
       <div className="lg:flex lg:items-start lg:gap-6">
         <div className="flex-1 min-w-0">
-          <HoldingsList binderId={id} initial={(holdings ?? []) as Holding[]} />
+          <HoldingsList binderId={id} binderGame={binder.game as Binder['game']} initial={(holdings ?? []) as Holding[]} />
         </div>
         <aside className="mt-6 lg:mt-0 lg:w-72 lg:shrink-0">
           <div className="rounded-xl border border-line bg-surface px-4 py-4 lg:sticky lg:top-20">

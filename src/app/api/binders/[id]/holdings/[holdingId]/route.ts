@@ -11,11 +11,21 @@ export async function PATCH(
 
   const { holdingId } = await params
   const body = await request.json()
-  const quantity = Math.max(1, Math.floor(Number(body.quantity) || 1))
+
+  const update: Record<string, unknown> = {}
+  if (body.quantity !== undefined) {
+    update.quantity = Math.max(1, Math.floor(Number(body.quantity) || 1))
+  }
+  if (typeof body.for_trade === 'boolean') {
+    update.for_trade = body.for_trade
+  }
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
+  }
 
   const { data, error } = await supabase
     .from('holdings')
-    .update({ quantity })
+    .update(update)
     .eq('id', holdingId)
     .eq('user_id', user.id)
     .select()
