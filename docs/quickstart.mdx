@@ -1,0 +1,100 @@
+---
+title: Quickstart
+description: Fetch a public binder, its history, and a trade list.
+---
+
+Every endpoint is a plain `GET` that returns JSON. No headers or keys are needed.
+
+## 1. Make something public
+
+The API only sees public resources:
+
+- **A binder** — open it in the app and choose **Make public**. Its share link
+  looks like `/(b)/<binder-id>`; the `<binder-id>` is what you pass below.
+- **A trade list** — open **View trades**, choose **Make public**, and copy the
+  share link `/(t)/<token>`; the `<token>` is what you pass below.
+
+## 2. Get a public binder
+
+```bash
+curl http://localhost:3000/api/v1/binders/<binder-id>
+```
+
+```json
+{
+  "binder": { "id": "…", "name": "My MTG binder", "game": "mtg" },
+  "card_count": 12,
+  "total_usd": 84.5,
+  "holdings": [
+    {
+      "card_id": "…",
+      "name": "Lightning Bolt",
+      "game": "mtg",
+      "set_name": "Magic 2011",
+      "set_code": "m11",
+      "collector_number": "149",
+      "rarity": "common",
+      "image_url": "https://…",
+      "quantity": 2,
+      "for_trade": true,
+      "price": { "usd": 1.25, "usd_foil": 6.0, "eur": 1.1 }
+    }
+  ],
+  "attribution": "Card data and pricing courtesy of Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece)…"
+}
+```
+
+A missing or private binder returns `404`:
+
+```json
+{ "error": "Binder not found or not public" }
+```
+
+## 3. Get a binder's value history
+
+Binder's own daily snapshots — not upstream history.
+
+```bash
+curl http://localhost:3000/api/v1/binders/<binder-id>/history
+```
+
+```json
+{
+  "binder_id": "…",
+  "history": [
+    { "day": "2026-07-01T00:00:00+00:00", "total_usd": 80.0 },
+    { "day": "2026-07-02T00:00:00+00:00", "total_usd": 84.5 }
+  ],
+  "attribution": "…"
+}
+```
+
+## 4. Get a public trade list
+
+```bash
+curl http://localhost:3000/api/v1/trades/<token>
+```
+
+```json
+{
+  "total_cards": 5,
+  "cards": [
+    {
+      "card_id": "…",
+      "name": "Charizard",
+      "game": "pokemon",
+      "set_name": "Base Set",
+      "quantity": 1,
+      "price": { "usd": 300.0, "usd_foil": null, "eur": null }
+    }
+  ],
+  "attribution": "…"
+}
+```
+
+## Notes
+
+- Responses are cached for 5 minutes (`Cache-Control: public, max-age=300`).
+- CORS is open (`Access-Control-Allow-Origin: *`) so you can call the API from a
+  browser app.
+- The machine-readable spec is at `/api/v1/openapi.json`.

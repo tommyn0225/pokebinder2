@@ -1,0 +1,52 @@
+---
+title: Introduction
+description: Read-only access to Binder's value-added collection layer.
+---
+
+The **Binder Public API** exposes Binder's own value-added layer — public binders,
+their valuation and price history, and public trade lists. It is read-only and
+requires no authentication.
+
+## What it is (and isn't)
+
+Binder is built on three free upstream sources: **Scryfall** (Magic: The
+Gathering), **PokéWallet** (Pokémon), and **OPTCG API** (One Piece). Their terms
+allow value-added apps, but not simply proxying or republishing their data.
+
+So this API serves **our layer** — binders, holdings, valuation, and the price
+history we build ourselves from daily snapshots — and deliberately does **not**
+offer a raw card or price search passthrough. Every response includes an
+`attribution` field crediting the upstream sources.
+
+## Authentication
+
+None. There are no API keys.
+
+The API only returns resources whose owner has explicitly made them **public**
+(a public binder, or a trade list toggled to public). Anything private — or that
+doesn't exist — returns `404`.
+
+## Base URL
+
+During local development:
+
+```
+http://localhost:3000
+```
+
+<Note>
+  A production base URL will be added once the app is deployed. Until then, run
+  the Binder app locally and call the API at `localhost:3000`.
+</Note>
+
+## Endpoints
+
+| Method | Path | Description |
+| ------ | ---- | ----------- |
+| `GET` | `/api/v1/binders/{id}` | A public binder with holdings and total value |
+| `GET` | `/api/v1/binders/{id}/history` | A public binder's daily value history |
+| `GET` | `/api/v1/trades/{token}` | A public trade list |
+| `GET` | `/api/v1/openapi.json` | This OpenAPI document |
+
+See the [Quickstart](/quickstart) for end-to-end examples, or the
+**API reference** tab for the full schema.

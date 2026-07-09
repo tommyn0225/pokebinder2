@@ -1,0 +1,242 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Binder Public API",
+    "version": "1.0.0",
+    "description": "Read-only access to Binder's own value-added layer: public binders (holdings and valuation), a binder's price history, and public trade lists.\n\nThis API deliberately does not expose a raw card or price search passthrough. Card data and pricing come from Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece); every response includes an `attribution` field crediting them.\n\nNo authentication is required. Only resources their owner has explicitly made public are reachable; everything else returns 404.",
+    "contact": {
+      "name": "Binder"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local development"
+    }
+  ],
+  "tags": [
+    { "name": "Binders", "description": "Public binders and their price history" },
+    { "name": "Trades", "description": "Public trade lists" },
+    { "name": "Meta", "description": "API metadata" }
+  ],
+  "paths": {
+    "/api/v1/binders/{id}": {
+      "get": {
+        "tags": ["Binders"],
+        "summary": "Get a public binder",
+        "description": "Returns a public binder's metadata, its holdings, and current total USD value. Returns 404 if the binder does not exist or is not public.",
+        "operationId": "getPublicBinder",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Binder UUID.",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The public binder.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/BinderResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "Binder not found or not public.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/binders/{id}/history": {
+      "get": {
+        "tags": ["Binders"],
+        "summary": "Get a public binder's value history",
+        "description": "Returns Binder's own daily price history for a public binder, built from our snapshots (not upstream history). Returns 404 if the binder does not exist or is not public.",
+        "operationId": "getPublicBinderHistory",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Binder UUID.",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daily value history.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HistoryResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "Binder not found or not public.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trades/{token}": {
+      "get": {
+        "tags": ["Trades"],
+        "summary": "Get a public trade list",
+        "description": "Returns the cards a user has marked for trade, addressed by the trade list's share token. Returns 404 if the token is unknown or the trade list is not public.",
+        "operationId": "getPublicTradeList",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "description": "Trade list share token (UUID).",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The public trade list.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TradesResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "Trade list not found or not public.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/openapi.json": {
+      "get": {
+        "tags": ["Meta"],
+        "summary": "Get this OpenAPI document",
+        "operationId": "getOpenApi",
+        "responses": {
+          "200": {
+            "description": "The OpenAPI 3.0 specification for this API.",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Game": {
+        "type": "string",
+        "enum": ["mtg", "pokemon", "onepiece"],
+        "description": "The trading card game a binder or card belongs to."
+      },
+      "Price": {
+        "type": "object",
+        "description": "Current prices. Any field may be null when unavailable upstream.",
+        "properties": {
+          "usd": { "type": "number", "nullable": true },
+          "usd_foil": { "type": "number", "nullable": true },
+          "eur": { "type": "number", "nullable": true }
+        }
+      },
+      "Card": {
+        "type": "object",
+        "properties": {
+          "card_id": { "type": "string" },
+          "name": { "type": "string" },
+          "game": { "$ref": "#/components/schemas/Game" },
+          "set_name": { "type": "string" },
+          "set_code": { "type": "string" },
+          "collector_number": { "type": "string" },
+          "rarity": { "type": "string", "nullable": true },
+          "image_url": { "type": "string", "nullable": true },
+          "quantity": { "type": "integer", "minimum": 1 },
+          "for_trade": { "type": "boolean", "description": "Present on binder responses; whether this holding is marked for trade." },
+          "price": { "$ref": "#/components/schemas/Price" }
+        },
+        "required": ["card_id", "name", "game", "set_name", "quantity", "price"]
+      },
+      "BinderResponse": {
+        "type": "object",
+        "properties": {
+          "binder": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "name": { "type": "string" },
+              "game": { "$ref": "#/components/schemas/Game" }
+            },
+            "required": ["id", "name", "game"]
+          },
+          "card_count": { "type": "integer", "description": "Sum of holding quantities." },
+          "total_usd": { "type": "number", "description": "Current total USD value of the binder." },
+          "holdings": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Card" }
+          },
+          "attribution": { "type": "string" }
+        },
+        "required": ["binder", "card_count", "total_usd", "holdings", "attribution"]
+      },
+      "HistoryPoint": {
+        "type": "object",
+        "properties": {
+          "day": { "type": "string", "format": "date-time" },
+          "total_usd": { "type": "number" }
+        },
+        "required": ["day", "total_usd"]
+      },
+      "HistoryResponse": {
+        "type": "object",
+        "properties": {
+          "binder_id": { "type": "string", "format": "uuid" },
+          "history": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/HistoryPoint" }
+          },
+          "attribution": { "type": "string" }
+        },
+        "required": ["binder_id", "history", "attribution"]
+      },
+      "TradesResponse": {
+        "type": "object",
+        "properties": {
+          "total_cards": { "type": "integer" },
+          "cards": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Card" }
+          },
+          "attribution": { "type": "string" }
+        },
+        "required": ["total_cards", "cards", "attribution"]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string" }
+        },
+        "required": ["error"]
+      }
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Binder API",
+  "colors": {
+    "primary": "#7c3aed",
+    "light": "#8b5cf6",
+    "dark": "#7c3aed"
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting started",
+            "pages": ["introduction", "quickstart"]
+          }
+        ]
+      },
+      {
+        "tab": "API reference",
+        "openapi": "openapi.json"
+      }
+    ]
+  },
+  "footer": {
+    "socials": {}
+  }
+}
