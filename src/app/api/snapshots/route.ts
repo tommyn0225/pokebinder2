@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { scryfallAdapter } from '@/lib/adapters/scryfall'
 import { pokewalletAdapter } from '@/lib/adapters/pokewallet'
 import { optcgAdapter } from '@/lib/adapters/optcg'
-import type { GameAdapter } from '@/types/card'
+import type { Card, GameAdapter } from '@/types/card'
 
 const ADAPTERS: Record<string, GameAdapter> = {
   mtg: scryfallAdapter,
@@ -36,15 +36,31 @@ export async function POST(request: Request) {
     unique.set(`${h.game}:${h.card_id}`, { card_id: h.card_id, game: h.game })
   }
 
-  // Fetch current prices for each unique card
-  const priceMap = new Map<string, number | null>()
+  // Fetch the current normalized card for each unique card
+  const cardMap = new Map<string, Card | null>()
   await Promise.allSettled(
     Array.from(unique.values()).map(async ({ card_id, game }) => {
       const adapter = ADAPTERS[game]
       if (!adapter) return
       const card = await adapter.getById(card_id)
-      priceMap.set(`${game}:${card_id}`, card?.price.usd ?? null)
+      cardMap.set(`${game}:${card_id}`, card)
     })
+  )
+
+  // Refresh holdings.card_data with the freshest normalized card. Valuation,
+  // the v1 catalog, and share pages all read card_data, so without this the
+  // headline "current value" stays frozen at the price the card had when it
+  // was first added while only the trend chart moves. One update per unique
+  // card covers every user's holding of it (card_data is user-independent).
+  // Skip cards whose fetch failed so a flaky upstream never blanks out data.
+  const refreshes = Array.from(unique.values())
+    .map(({ card_id, game }) => ({ card_id, game, card: cardMap.get(`${game}:${card_id}`) }))
+    .filter((r): r is { card_id: string; game: string; card: Card } => Boolean(r.card))
+
+  await Promise.allSettled(
+    refreshes.map(({ card_id, game, card }) =>
+      supabase.from('holdings').update({ card_data: card }).eq('game', game).eq('card_id', card_id)
+    )
   )
 
   // Build snapshot rows
@@ -53,12 +69,12 @@ export async function POST(request: Request) {
     holding_id: h.id,
     card_id: h.card_id,
     game: h.game,
-    price_usd: priceMap.get(`${h.game}:${h.card_id}`) ?? null,
+    price_usd: cardMap.get(`${h.game}:${h.card_id}`)?.price.usd ?? null,
     snapshotted_at: now,
   }))
 
   const { error: insertError } = await supabase.from('price_snapshots').insert(rows)
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
 
-  return NextResponse.json({ inserted: rows.length })
+  return NextResponse.json({ inserted: rows.length, refreshed: refreshes.length })
 }
