@@ -29,6 +29,20 @@ export default function Navbar({ userEmail }: NavbarProps) {
       <div className="max-w-7xl mx-auto px-6 h-14 flex items-center gap-6">
         {/* Logo */}
         <Link href={userEmail ? '/dashboard' : '/'} className="flex items-center gap-2 mr-2">
+          <svg
+            aria-hidden="true"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            className="text-brand"
+          >
+            <rect x="7" y="3" width="13" height="18" rx="2.5" />
+            <path d="M7 8.5H4.5M7 15.5H4.5" />
+          </svg>
           <span className="text-lg font-bold tracking-tight text-ink">
             Binder<span className="text-brand">.</span>
           </span>
