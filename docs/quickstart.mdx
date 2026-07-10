@@ -92,6 +92,63 @@ curl http://localhost:3000/api/v1/trades/<token>
 }
 ```
 
+## 5. Search the card catalog
+
+The catalog needs no IDs at all — it's every card tracked in Binder, in one
+normalized model across all three games:
+
+```bash
+curl "http://localhost:3000/api/v1/cards?q=charizard&game=pokemon"
+```
+
+```json
+{
+  "count": 1,
+  "cards": [
+    {
+      "card_id": "base1-4",
+      "name": "Charizard",
+      "game": "pokemon",
+      "set_name": "Base Set",
+      "set_code": "base1",
+      "collector_number": "4",
+      "rarity": "Rare Holo",
+      "image_url": "https://…",
+      "price": { "usd": 300.0, "usd_foil": null, "eur": null }
+    }
+  ],
+  "attribution": "…"
+}
+```
+
+`game` and `q` are optional; `limit` caps results (default 50, max 100).
+
+## 6. Get one card with its price history
+
+Use a `card_id` from the search above. The history is Binder's own daily
+snapshots, one point per day:
+
+```bash
+curl http://localhost:3000/api/v1/cards/pokemon/base1-4
+```
+
+```json
+{
+  "card": { "card_id": "base1-4", "name": "Charizard", "game": "pokemon", "…": "…" },
+  "history": [
+    { "day": "2026-07-01", "price_usd": 295.0 },
+    { "day": "2026-07-02", "price_usd": 300.0 }
+  ],
+  "attribution": "…"
+}
+```
+
+A card no Binder user tracks returns `404`:
+
+```json
+{ "error": "Card not found in catalog" }
+```
+
 ## Notes
 
 - Responses are cached for 5 minutes (`Cache-Control: public, max-age=300`).

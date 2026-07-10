@@ -13,6 +13,12 @@ export const V1_HEADERS: Record<string, string> = {
   'Cache-Control': 'public, max-age=300, stale-while-revalidate=3600',
 }
 
+export const GAMES = ['mtg', 'pokemon', 'onepiece'] as const
+
+export function isGame(value: string): value is Card['game'] {
+  return (GAMES as readonly string[]).includes(value)
+}
+
 export interface ApiCard {
   card_id: string
   name: string
@@ -46,4 +52,22 @@ export function serializeHolding(
   }
   if (opts.includeForTrade) card.for_trade = h.for_trade ?? false
   return card
+}
+
+// A catalog entry is a card without holding context (no quantity/for_trade):
+// the catalog spans all users, so per-holding fields must not leak through it.
+export type CatalogCard = Omit<ApiCard, 'quantity' | 'for_trade'>
+
+export function serializeCard(c: Card): CatalogCard {
+  return {
+    card_id: c.id,
+    name: c.name,
+    game: c.game,
+    set_name: c.set_name,
+    set_code: c.set_code,
+    collector_number: c.collector_number,
+    rarity: c.rarity,
+    image_url: c.image_url,
+    price: c.price,
+  }
 }

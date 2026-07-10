@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Binder Public API",
-    "version": "1.0.0",
-    "description": "Read-only access to Binder's own value-added layer: public binders (holdings and valuation), a binder's price history, and public trade lists.\n\nThis API deliberately does not expose a raw card or price search passthrough. Card data and pricing come from Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece); every response includes an `attribution` field crediting them.\n\nNo authentication is required. Only resources their owner has explicitly made public are reachable; everything else returns 404.",
+    "version": "1.1.0",
+    "description": "Read-only access to Binder's own value-added layer: public binders (holdings and valuation), a binder's price history, public trade lists, and Binder's normalized card catalog.\n\nThe catalog covers every card tracked in Binder, in our normalized cross-game model, with a per-card price history built from our own daily snapshots. It is enough to build a collection app of your own on top of. This API deliberately does not expose a live upstream card or price search passthrough. Card data and pricing come from Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece); every response includes an `attribution` field crediting them.\n\nNo authentication is required. Only resources their owner has explicitly made public are reachable; everything else returns 404.",
     "contact": {
       "name": "Binder"
     }
@@ -17,6 +17,7 @@
   "tags": [
     { "name": "Binders", "description": "Public binders and their price history" },
     { "name": "Trades", "description": "Public trade lists" },
+    { "name": "Cards", "description": "Binder's normalized card catalog and per-card price history" },
     { "name": "Meta", "description": "API metadata" }
   ],
   "paths": {
@@ -125,6 +126,96 @@
         }
       }
     },
+    "/api/v1/cards": {
+      "get": {
+        "tags": ["Cards"],
+        "summary": "Search the card catalog",
+        "description": "Searches Binder's normalized card catalog — every distinct card tracked in Binder, across all three games. Served from Binder's own data, not a live upstream search, so a card appears here once someone tracks it.",
+        "operationId": "searchCards",
+        "parameters": [
+          {
+            "name": "game",
+            "in": "query",
+            "required": false,
+            "description": "Restrict results to one game.",
+            "schema": { "$ref": "#/components/schemas/Game" }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "Case-insensitive substring match on the card name.",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Maximum number of cards to return (1–100).",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching catalog cards, sorted by name.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CardsResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown game.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cards/{game}/{id}": {
+      "get": {
+        "tags": ["Cards"],
+        "summary": "Get a catalog card with price history",
+        "description": "Returns one card from the catalog in Binder's normalized model, with Binder's own daily USD price history for it (built from our snapshots, not upstream history). Returns 404 if no Binder user tracks the card.",
+        "operationId": "getCard",
+        "parameters": [
+          {
+            "name": "game",
+            "in": "path",
+            "required": true,
+            "schema": { "$ref": "#/components/schemas/Game" }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The card's upstream id (Scryfall UUID, PokéWallet card id, or OPTCG card id).",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The card and its price history.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CardResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "Card not found in catalog.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/openapi.json": {
       "get": {
         "tags": ["Meta"],
@@ -197,6 +288,54 @@
           "attribution": { "type": "string" }
         },
         "required": ["binder", "card_count", "total_usd", "holdings", "attribution"]
+      },
+      "CatalogCard": {
+        "type": "object",
+        "description": "A card in Binder's normalized cross-game model, without holding context (no quantities — the catalog never exposes who holds a card or how many).",
+        "properties": {
+          "card_id": { "type": "string" },
+          "name": { "type": "string" },
+          "game": { "$ref": "#/components/schemas/Game" },
+          "set_name": { "type": "string" },
+          "set_code": { "type": "string" },
+          "collector_number": { "type": "string" },
+          "rarity": { "type": "string", "nullable": true },
+          "image_url": { "type": "string", "nullable": true },
+          "price": { "$ref": "#/components/schemas/Price" }
+        },
+        "required": ["card_id", "name", "game", "set_name", "price"]
+      },
+      "CardsResponse": {
+        "type": "object",
+        "properties": {
+          "count": { "type": "integer" },
+          "cards": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CatalogCard" }
+          },
+          "attribution": { "type": "string" }
+        },
+        "required": ["count", "cards", "attribution"]
+      },
+      "PricePoint": {
+        "type": "object",
+        "properties": {
+          "day": { "type": "string", "format": "date", "example": "2026-07-01" },
+          "price_usd": { "type": "number" }
+        },
+        "required": ["day", "price_usd"]
+      },
+      "CardResponse": {
+        "type": "object",
+        "properties": {
+          "card": { "$ref": "#/components/schemas/CatalogCard" },
+          "history": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PricePoint" }
+          },
+          "attribution": { "type": "string" }
+        },
+        "required": ["card", "history", "attribution"]
       },
       "HistoryPoint": {
         "type": "object",
