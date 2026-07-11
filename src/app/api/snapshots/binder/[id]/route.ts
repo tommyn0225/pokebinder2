@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { logError } from '@/lib/logError'
 
 export interface BinderHistoryPoint {
   day: string
@@ -35,7 +36,10 @@ export async function GET(
   const serviceClient = createServiceClient()
   const { data, error } = await serviceClient.rpc('binder_value_history', { binder_id_param: id })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    logError('snapshots:binder', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
   return NextResponse.json({ history: data as BinderHistoryPoint[] })
 }

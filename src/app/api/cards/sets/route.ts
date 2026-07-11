@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCached, setCached } from '@/lib/cache'
+import { logError } from '@/lib/logError'
 
 const TTL = 60 * 60 * 24 // 24h
 
@@ -74,8 +75,8 @@ async function getOnePieceSets(): Promise<SetInfo[]> {
   })
   if (!res.ok) throw new Error('Failed to fetch One Piece sets')
   const data = await res.json()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const raw = Array.isArray(data) ? data : (data.data ?? [])
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sets: SetInfo[] = raw.map((s: any) => ({
     id: s.group_id ?? s.set_id ?? s.id,
     name: s.name,
@@ -99,6 +100,7 @@ export async function GET(req: NextRequest) {
       headers: { 'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800' },
     })
   } catch (e) {
+    logError(`cards/sets:${game}`, e)
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Failed to load sets' }, { status: 500 })
   }
 }

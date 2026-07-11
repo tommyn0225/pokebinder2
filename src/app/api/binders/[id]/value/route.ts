@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { holdingUnitPrice, summarizeGain } from '@/lib/holdingValue'
+import { logError } from '@/lib/logError'
 import type { Holding } from '@/types/holding'
 
 export async function GET(
@@ -27,7 +28,10 @@ export async function GET(
     .select('quantity, finish, acquired_price_usd, card_data')
     .eq('binder_id', id)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    logError('binder:value', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
   const holdings = (data ?? []) as Pick<Holding, 'quantity' | 'finish' | 'acquired_price_usd' | 'card_data'>[]
   const total_usd = holdings.reduce((sum, h) => sum + holdingUnitPrice(h) * h.quantity, 0)

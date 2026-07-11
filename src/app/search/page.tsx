@@ -150,6 +150,7 @@ function AddToBinderButton({ card, binders }: AddToBinderProps) {
   const [failed, setFailed] = useState<string | null>(null)
   const [finish, setFinish] = useState<Finish>('nonfoil')
   const ref = useRef<HTMLDivElement>(null)
+  const toast = useToast()
 
   // A binder holds a single game, so only offer binders matching this card's
   // game — the server rejects mismatches, but don't surface them as options.
@@ -179,6 +180,8 @@ function AddToBinderButton({ card, binders }: AddToBinderProps) {
         }),
       })
       if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        toast(json.error ?? 'Failed to add card', 'error')
         setFailed(binderId)
         setTimeout(() => setFailed(null), 1800)
         return

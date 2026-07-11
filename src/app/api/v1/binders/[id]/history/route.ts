@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { ATTRIBUTION, V1_HEADERS } from '@/lib/publicApi'
+import { logError } from '@/lib/logError'
 
 interface HistoryPoint {
   day: string
@@ -34,6 +35,7 @@ export async function GET(
   // Our own price history, built from daily snapshots — not upstream history.
   const { data, error } = await supabase.rpc('binder_value_history', { binder_id_param: id })
   if (error) {
+    logError('v1:binder-history', error)
     return NextResponse.json({ error: error.message }, { status: 500, headers: V1_HEADERS })
   }
 

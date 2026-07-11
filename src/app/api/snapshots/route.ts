@@ -4,6 +4,7 @@ import { scryfallAdapter } from '@/lib/adapters/scryfall'
 import { pokewalletAdapter } from '@/lib/adapters/pokewallet'
 import { optcgAdapter } from '@/lib/adapters/optcg'
 import { finishPrice } from '@/lib/holdingValue'
+import { logError } from '@/lib/logError'
 import type { Card, GameAdapter } from '@/types/card'
 
 const ADAPTERS: Record<string, GameAdapter> = {
@@ -25,7 +26,10 @@ export async function POST(request: Request) {
     .from('holdings')
     .select('id, card_id, game, finish')
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    logError('snapshots:holdings-read', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
   if (!holdings || holdings.length === 0) {
     return NextResponse.json({ inserted: 0 })
   }
@@ -43,8 +47,13 @@ export async function POST(request: Request) {
     Array.from(unique.values()).map(async ({ card_id, game }) => {
       const adapter = ADAPTERS[game]
       if (!adapter) return
-      const card = await adapter.getById(card_id)
-      cardMap.set(`${game}:${card_id}`, card)
+      try {
+        cardMap.set(`${game}:${card_id}`, await adapter.getById(card_id))
+      } catch (err) {
+        // A single upstream failure must not sink the whole run; log it so a
+        // quota exhaustion or shape change is visible, and leave this card stale.
+        logError(`snapshots:getById:${game}:${card_id}`, err)
+      }
     })
   )
 
@@ -78,7 +87,10 @@ export async function POST(request: Request) {
   })
 
   const { error: insertError } = await supabase.from('price_snapshots').insert(rows)
-  if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
+  if (insertError) {
+    logError('snapshots:insert', insertError)
+    return NextResponse.json({ error: insertError.message }, { status: 500 })
+  }
 
   return NextResponse.json({ inserted: rows.length, refreshed: refreshes.length })
 }

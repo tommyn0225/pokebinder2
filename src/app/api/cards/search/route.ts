@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { scryfallAdapter } from '@/lib/adapters/scryfall'
 import { pokewalletAdapter } from '@/lib/adapters/pokewallet'
 import { optcgAdapter } from '@/lib/adapters/optcg'
+import { logError } from '@/lib/logError'
 import type { GameAdapter, SearchFilters } from '@/types/card'
 
 const adapters: Record<string, GameAdapter> = {
@@ -48,7 +49,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(result, {
       headers: { 'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400' },
     })
-  } catch {
+  } catch (err) {
+    logError(`cards/search:${game}`, err)
     return NextResponse.json({ error: 'Search failed. Please try again.' }, { status: 500 })
   }
 }

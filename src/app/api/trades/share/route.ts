@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { logError } from '@/lib/logError'
 
 export async function PATCH(request: Request) {
   const supabase = await createClient()
@@ -18,6 +19,9 @@ export async function PATCH(request: Request) {
     .select('token, is_public')
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    logError('trades:share', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
   return NextResponse.json(data)
 }

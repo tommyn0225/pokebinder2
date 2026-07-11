@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { logError } from '@/lib/logError'
 import type { ValueHistoryPoint } from '@/components/ValueChart'
 
 export async function GET() {
@@ -14,7 +15,10 @@ export async function GET() {
   const serviceClient = createServiceClient()
   const { data, error } = await serviceClient.rpc('collection_value_history', { user_id_param: user.id })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    logError('snapshots:collection', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
   return NextResponse.json({ history: data as ValueHistoryPoint[] })
 }

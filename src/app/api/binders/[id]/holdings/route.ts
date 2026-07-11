@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { finishPrice } from '@/lib/holdingValue'
+import { isGame } from '@/lib/publicApi'
+import { logError } from '@/lib/logError'
 import type { Card } from '@/types/card'
 
 export async function GET(
@@ -29,7 +31,10 @@ export async function GET(
     .eq('binder_id', id)
     .order('created_at', { ascending: true })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    logError('holdings:list', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
   return NextResponse.json(data)
 }
 
@@ -64,6 +69,12 @@ export async function POST(
 
   if (!card_id || !game || !card_data) {
     return NextResponse.json({ error: 'card_id, game, and card_data are required' }, { status: 400 })
+  }
+
+  // Reject unknown games outright (clearer than a binder-mismatch message) and
+  // guarantee `game` maps to a real adapter before it's persisted.
+  if (!isGame(game)) {
+    return NextResponse.json({ error: 'Unknown game; expected mtg, pokemon, or onepiece' }, { status: 400 })
   }
 
   // A binder holds one game; reject cards from any other game so a Pokémon card
@@ -116,7 +127,10 @@ export async function POST(
       .eq('id', existing.id)
       .select()
       .single()
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      logError('holdings:increment', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
     return NextResponse.json(data)
   }
 
@@ -126,6 +140,9 @@ export async function POST(
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    logError('holdings:insert', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
   return NextResponse.json(data, { status: 201 })
 }
