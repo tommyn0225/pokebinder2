@@ -44,7 +44,7 @@ export async function POST(
 
   const { data: binder } = await supabase
     .from('binders')
-    .select('id')
+    .select('id, game')
     .eq('id', id)
     .eq('user_id', user.id)
     .single()
@@ -62,6 +62,16 @@ export async function POST(
 
   if (!card_id || !game || !card_data) {
     return NextResponse.json({ error: 'card_id, game, and card_data are required' }, { status: 400 })
+  }
+
+  // A binder holds one game; reject cards from any other game so a Pokémon card
+  // can't land in a One Piece binder, etc. This is the authoritative check —
+  // clients also filter, but the server must not trust them.
+  if (game !== binder.game) {
+    return NextResponse.json(
+      { error: `This binder only holds ${binder.game} cards.` },
+      { status: 400 }
+    )
   }
 
   if (finishRaw !== undefined && finishRaw !== 'nonfoil' && finishRaw !== 'foil') {

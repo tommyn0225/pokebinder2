@@ -2,14 +2,23 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import type { Card, CardSearchResult } from '@/types/card'
+import type { Finish } from '@/types/holding'
 import type { SetInfo } from '@/app/api/cards/sets/route'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
+import { finishPrice } from '@/lib/holdingValue'
 import { useToast } from '@/components/Toast'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type Game = 'mtg' | 'pokemon' | 'onepiece'
 type SortKey = 'name' | 'price_asc' | 'price_desc'
+type BinderRef = { id: string; name: string; game: Game }
+
+const GAME_LABELS: Record<Game, string> = {
+  mtg: 'MTG',
+  pokemon: 'Pokémon',
+  onepiece: 'One Piece',
+}
 
 interface Filters {
   set: string
@@ -131,7 +140,7 @@ function PriceTag({ price }: { price: Card['price'] }) {
 
 interface AddToBinderProps {
   card: Card
-  binders: { id: string; name: string }[]
+  binders: BinderRef[]
 }
 
 function AddToBinderButton({ card, binders }: AddToBinderProps) {
@@ -139,7 +148,12 @@ function AddToBinderButton({ card, binders }: AddToBinderProps) {
   const [adding, setAdding] = useState<string | null>(null)
   const [done, setDone]   = useState<string | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
+  const [finish, setFinish] = useState<Finish>('nonfoil')
   const ref = useRef<HTMLDivElement>(null)
+
+  // A binder holds a single game, so only offer binders matching this card's
+  // game — the server rejects mismatches, but don't surface them as options.
+  const eligible = binders.filter((b) => b.game === card.game)
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -160,6 +174,7 @@ function AddToBinderButton({ card, binders }: AddToBinderProps) {
           card_id: card.id,
           game: card.game,
           quantity: 1,
+          finish,
           card_data: card,
         }),
       })
@@ -177,6 +192,20 @@ function AddToBinderButton({ card, binders }: AddToBinderProps) {
 
   if (binders.length === 0) return null
 
+  // Binders exist but none for this game: say so instead of a dead button.
+  if (eligible.length === 0) {
+    return (
+      <button
+        type="button"
+        disabled
+        title={`Create a ${GAME_LABELS[card.game]} binder to add this card`}
+        className="microlabel w-full border border-line text-muted py-1.5 rounded cursor-not-allowed"
+      >
+        No {GAME_LABELS[card.game]} binder
+      </button>
+    )
+  }
+
   return (
     <div ref={ref} className="relative">
       <button
@@ -187,7 +216,30 @@ function AddToBinderButton({ card, binders }: AddToBinderProps) {
       </button>
       {open && (
         <div className="absolute bottom-full mb-1 left-0 right-0 bg-surface border border-line rounded-lg shadow-md z-20 overflow-hidden">
-          {binders.map((b) => (
+          {/* Finish selector — only offered when the card has a foil printing;
+              each option shows its own price so switching changes what's added */}
+          {card.price.usd_foil != null && (
+            <div className="flex divide-x divide-line border-b border-line" role="group" aria-label="Finish">
+              {(['nonfoil', 'foil'] as Finish[]).map((f) => {
+                const p = finishPrice(f, card.price)
+                return (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setFinish(f) }}
+                    aria-pressed={finish === f}
+                    className={`flex-1 py-1.5 px-1 text-center transition-colors ${
+                      finish === f ? 'bg-brand text-brand-contrast' : 'bg-surface text-muted hover:text-ink'
+                    }`}
+                  >
+                    <span className="microlabel block">{f === 'foil' ? 'Foil' : 'Normal'}</span>
+                    <span className="block text-[10px] font-mono opacity-90">{p != null ? `$${p.toFixed(2)}` : '—'}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+          {eligible.map((b) => (
             <button
               key={b.id}
               onClick={(e) => { e.stopPropagation(); add(b.id) }}
@@ -206,7 +258,7 @@ function AddToBinderButton({ card, binders }: AddToBinderProps) {
   )
 }
 
-function CardGrid({ cards, binders, onSelect }: { cards: Card[]; binders: { id: string; name: string }[]; onSelect: (card: Card) => void }) {
+function CardGrid({ cards, binders, onSelect }: { cards: Card[]; binders: BinderRef[]; onSelect: (card: Card) => void }) {
   if (cards.length === 0) return null
   return (
     <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -249,7 +301,7 @@ function CardGrid({ cards, binders, onSelect }: { cards: Card[]; binders: { id: 
 
 // ── Card detail modal ─────────────────────────────────────────────────────────
 
-function CardModal({ card, binders, onClose }: { card: Card; binders: { id: string; name: string }[]; onClose: () => void }) {
+function CardModal({ card, binders, onClose }: { card: Card; binders: BinderRef[]; onClose: () => void }) {
   useEffect(() => {
     document.body.style.overflow = 'hidden'
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
@@ -644,7 +696,7 @@ export default function SearchPage() {
   const [loading,     setLoading]     = useState(false)
   const [sets,        setSets]        = useState<SetInfo[]>([])
   const [setsLoading, setSetsLoading] = useState(false)
-  const [binders,     setBinders]     = useState<{ id: string; name: string }[]>([])
+  const [binders,     setBinders]     = useState<BinderRef[]>([])
   const [page,        setPage]        = useState(1)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [modalCard,   setModalCard]   = useState<Card | null>(null)

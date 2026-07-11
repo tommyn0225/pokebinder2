@@ -114,7 +114,7 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
   }, [debouncedQuery, search])
 
   async function handleAdd(card: Card) {
-    const finish: Finish = foilSel[card.id] ? 'foil' : 'nonfoil'
+    const finish: Finish = card.price.usd_foil != null && foilSel[card.id] ? 'foil' : 'nonfoil'
     setAdding(card.id)
     const res = await fetch(`/api/binders/${binderId}/holdings`, {
       method: 'POST',
@@ -206,12 +206,12 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
             {results.length > 0 && (
               <ul className="rounded-md border border-line divide-y divide-line bg-surface max-h-72 overflow-y-auto">
                 {results.map(card => {
-                  const finish: Finish = foilSel[card.id] ? 'foil' : 'nonfoil'
-                  // Show the foil price when we have one, otherwise fall back to
-                  // the card's normal price display (foil still marks the copy).
+                  // Foil is only offered when the card has a foil printing.
+                  const foilable = card.price.usd_foil != null
+                  const finish: Finish = foilable && foilSel[card.id] ? 'foil' : 'nonfoil'
                   const priceStr =
-                    finish === 'foil' && card.price.usd_foil != null
-                      ? `$${card.price.usd_foil.toFixed(2)}`
+                    finish === 'foil'
+                      ? `$${card.price.usd_foil!.toFixed(2)}`
                       : priceDisplay(card)
                   return (
                   <li key={card.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-background transition-colors">
@@ -222,26 +222,28 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
                       <p className="text-sm font-medium text-ink truncate">{card.name}</p>
                       <p className="text-xs text-muted">{card.set_name} · {priceStr}</p>
                     </div>
-                    {/* Finish selector — always shown, defaults to Normal */}
-                    <div
-                      role="group"
-                      aria-label={`Finish for ${card.name}`}
-                      className="flex shrink-0 divide-x divide-line rounded-md border border-line overflow-hidden"
-                    >
-                      {(['nonfoil', 'foil'] as Finish[]).map(f => (
-                        <button
-                          key={f}
-                          type="button"
-                          onClick={() => setFoilSel(s => ({ ...s, [card.id]: f === 'foil' }))}
-                          aria-pressed={finish === f}
-                          className={`microlabel px-2.5 py-1.5 transition-colors ${
-                            finish === f ? 'bg-brand text-brand-contrast' : 'bg-surface text-muted hover:text-ink'
-                          }`}
-                        >
-                          {f === 'foil' ? 'Foil' : 'Normal'}
-                        </button>
-                      ))}
-                    </div>
+                    {/* Finish selector — only shown when a foil printing exists */}
+                    {foilable && (
+                      <div
+                        role="group"
+                        aria-label={`Finish for ${card.name}`}
+                        className="flex shrink-0 divide-x divide-line rounded-md border border-line overflow-hidden"
+                      >
+                        {(['nonfoil', 'foil'] as Finish[]).map(f => (
+                          <button
+                            key={f}
+                            type="button"
+                            onClick={() => setFoilSel(s => ({ ...s, [card.id]: f === 'foil' }))}
+                            aria-pressed={finish === f}
+                            className={`microlabel px-2.5 py-1.5 transition-colors ${
+                              finish === f ? 'bg-brand text-brand-contrast' : 'bg-surface text-muted hover:text-ink'
+                            }`}
+                          >
+                            {f === 'foil' ? 'Foil' : 'Normal'}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     <button
                       onClick={() => handleAdd(card)}
                       disabled={adding === card.id}
