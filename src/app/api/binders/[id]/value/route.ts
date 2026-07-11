@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { holdingUnitPrice } from '@/lib/holdingValue'
+import { holdingUnitPrice, summarizeGain } from '@/lib/holdingValue'
 import type { Holding } from '@/types/holding'
 
 export async function GET(
@@ -22,17 +22,18 @@ export async function GET(
 
   if (!binder) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const { data: holdings, error } = await supabase
+  const { data, error } = await supabase
     .from('holdings')
-    .select('quantity, finish, card_data')
+    .select('quantity, finish, acquired_price_usd, card_data')
     .eq('binder_id', id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const total_usd = (holdings as Pick<Holding, 'quantity' | 'finish' | 'card_data'>[]).reduce(
-    (sum, h) => sum + holdingUnitPrice(h) * h.quantity,
-    0
-  )
+  const holdings = (data ?? []) as Pick<Holding, 'quantity' | 'finish' | 'acquired_price_usd' | 'card_data'>[]
+  const total_usd = holdings.reduce((sum, h) => sum + holdingUnitPrice(h) * h.quantity, 0)
 
-  return NextResponse.json({ total_usd: Math.round(total_usd * 100) / 100 })
+  return NextResponse.json({
+    total_usd: Math.round(total_usd * 100) / 100,
+    ...summarizeGain(holdings),
+  })
 }

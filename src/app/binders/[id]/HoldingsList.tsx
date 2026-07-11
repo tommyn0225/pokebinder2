@@ -5,7 +5,7 @@ import type { Finish, Holding } from '@/types/holding'
 import type { Card, CardSearchResult } from '@/types/card'
 import type { Binder } from '@/types/binder'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
-import { finishPrice, holdingUnitPrice } from '@/lib/holdingValue'
+import { finishPrice, holdingUnitPrice, holdingCost, summarizeGain } from '@/lib/holdingValue'
 import { useToast } from '@/components/Toast'
 
 type GameKey = Binder['game']
@@ -36,6 +36,80 @@ function FoilTag() {
     <span className="microlabel rounded border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 px-1 py-0.5">
       Foil
     </span>
+  )
+}
+
+// ── Cost basis helpers ─────────────────────────────────────────────────────────
+
+function gainClass(n: number): string {
+  return n > 0 ? 'text-emerald-600 dark:text-emerald-400'
+    : n < 0 ? 'text-red-600 dark:text-red-400'
+    : 'text-muted'
+}
+
+function fmtSignedUsd(n: number): string {
+  return `${n >= 0 ? '+' : '−'}$${Math.abs(n).toFixed(2)}`
+}
+
+function fmtSignedPct(frac: number): string {
+  return `${frac >= 0 ? '+' : '−'}${Math.abs(frac * 100).toFixed(1)}%`
+}
+
+// Per-holding gain vs its recorded cost. Renders nothing when cost is unknown.
+function HoldingGain({ h }: { h: Holding }) {
+  const cost = holdingCost(h)
+  if (cost == null) return null
+  const value = holdingUnitPrice(h) * h.quantity
+  const gain = value - cost
+  const pct = cost > 0 ? gain / cost : null
+  return (
+    <span className={`text-xs font-mono ${gainClass(gain)}`}>
+      {fmtSignedUsd(gain)}{pct != null ? ` (${fmtSignedPct(pct)})` : ''}
+    </span>
+  )
+}
+
+// Inline editor for what the user paid (per copy). Click to edit; empty clears
+// it back to "cost unknown". Enter/blur commits, Escape cancels.
+function CostEditor({ holding, onSave }: { holding: Holding; onSave: (v: number | null) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [val, setVal] = useState('')
+
+  function begin() {
+    setVal(holding.acquired_price_usd != null ? String(holding.acquired_price_usd) : '')
+    setEditing(true)
+  }
+  function commit() {
+    setEditing(false)
+    const trimmed = val.trim()
+    if (trimmed === '') { onSave(null); return }
+    const n = Number(trimmed)
+    if (Number.isFinite(n) && n >= 0) onSave(n)
+  }
+
+  if (editing) {
+    return (
+      <span className="inline-flex items-center gap-0.5">
+        <span className="text-xs text-muted">$</span>
+        <input
+          type="number" min="0" step="0.01" autoFocus value={val}
+          onChange={e => setVal(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false) }}
+          onBlur={commit}
+          aria-label={`Price paid per copy for ${holding.card_data.name}`}
+          className="w-16 rounded border border-line bg-surface px-1 py-0.5 text-xs text-ink focus:outline-none focus:border-brand"
+        />
+      </span>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={begin}
+      className="text-xs text-muted hover:text-ink underline decoration-dotted underline-offset-2 transition-colors"
+    >
+      {holding.acquired_price_usd != null ? `$${holding.acquired_price_usd.toFixed(2)}` : 'Set cost'}
+    </button>
   )
 }
 
@@ -164,7 +238,19 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
     else setHoldings(prev => prev.filter(h => h.id !== holdingId))
   }
 
+  async function handleCostChange(holdingId: string, value: number | null) {
+    const res = await fetch(`/api/binders/${binderId}/holdings/${holdingId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ acquired_price_usd: value }),
+    })
+    const json = await res.json()
+    if (!res.ok) toast(json.error ?? 'Failed to update cost', 'error')
+    else setHoldings(prev => prev.map(h => h.id === holdingId ? json : h))
+  }
+
   const totalValue = holdings.reduce((sum, h) => sum + holdingUnitPrice(h) * h.quantity, 0)
+  const gain = summarizeGain(holdings)
   const placeholder = PLACEHOLDERS[binderGame] ?? 'Search cards…'
 
   return (
@@ -281,9 +367,23 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
                 </button>
               ))}
             </div>
-            <span className="text-sm font-semibold text-ink">${totalValue.toFixed(2)}</span>
+            <div className="text-right leading-tight">
+              <div className="text-sm font-semibold text-ink">${totalValue.toFixed(2)}</div>
+              {gain.costed_count > 0 && (
+                <div className={`text-xs font-mono ${gainClass(gain.gain)}`}>
+                  {fmtSignedUsd(gain.gain)}{gain.gain_pct != null ? ` (${fmtSignedPct(gain.gain_pct)})` : ''}
+                </div>
+              )}
+            </div>
           </div>
         </div>
+
+        {gain.uncosted_count > 0 && (
+          <p className="px-5 py-2 text-xs text-muted border-b border-line bg-background">
+            Gain/loss covers {gain.costed_count} card{gain.costed_count === 1 ? '' : 's'} with a recorded cost;
+            {' '}{gain.uncosted_count} without a cost {gain.uncosted_count === 1 ? 'is' : 'are'} excluded.
+          </p>
+        )}
 
         {holdings.length === 0 ? (
           <p className="text-center text-muted py-12 text-sm">
@@ -317,6 +417,10 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
                   <div className="mt-auto pt-1 flex items-center justify-between">
                     <span className="font-mono text-sm text-ink">{holdingPriceDisplay(h)}</span>
                     <QtyStepper quantity={h.quantity} name={h.card_data.name} onChange={q => handleQuantityChange(h.id, q)} />
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-muted">Paid <CostEditor holding={h} onSave={v => handleCostChange(h.id, v)} /></span>
+                    <HoldingGain h={h} />
                   </div>
                   <div className="flex items-center justify-between gap-2 pt-1">
                     <TradeToggle on={h.for_trade} name={h.card_data.name} onClick={() => handleToggleTrade(h.id, h.for_trade)} />
@@ -352,6 +456,10 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
                     <QtyStepper quantity={h.quantity} name={h.card_data.name} onChange={q => handleQuantityChange(h.id, q)} />
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-2">
+                    <span className="text-xs text-muted">Paid <CostEditor holding={h} onSave={v => handleCostChange(h.id, v)} /></span>
+                    <HoldingGain h={h} />
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-2">
                     <TradeToggle on={h.for_trade} name={h.card_data.name} onClick={() => handleToggleTrade(h.id, h.for_trade)} />
                     <button
                       onClick={() => handleRemove(h.id)}
@@ -372,6 +480,8 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
                 <th className="microlabel px-5 py-3 text-left font-normal text-muted">Card</th>
                 <th className="microlabel px-5 py-3 text-left font-normal text-muted">Set</th>
                 <th className="microlabel px-5 py-3 text-right font-normal text-muted">Price</th>
+                <th className="microlabel px-5 py-3 text-right font-normal text-muted">Paid</th>
+                <th className="microlabel px-5 py-3 text-right font-normal text-muted">Gain</th>
                 <th className="microlabel px-5 py-3 text-center font-normal text-muted">Qty</th>
                 <th className="microlabel px-5 py-3 text-center font-normal text-muted">Trade</th>
                 <th className="px-5 py-3" />
@@ -391,6 +501,10 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
                   </td>
                   <td className="px-5 py-3 text-muted">{h.card_data.set_name}</td>
                   <td className="px-5 py-3 text-right text-ink">{holdingPriceDisplay(h)}</td>
+                  <td className="px-5 py-3 text-right">
+                    <CostEditor holding={h} onSave={v => handleCostChange(h.id, v)} />
+                  </td>
+                  <td className="px-5 py-3 text-right"><HoldingGain h={h} /></td>
                   <td className="px-5 py-3">
                     <div className="flex justify-center">
                       <QtyStepper quantity={h.quantity} name={h.card_data.name} onChange={q => handleQuantityChange(h.id, q)} />

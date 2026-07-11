@@ -19,6 +19,19 @@ export async function PATCH(
   if (typeof body.for_trade === 'boolean') {
     update.for_trade = body.for_trade
   }
+  // Cost basis: accept a non-negative number, or null to clear it back to
+  // "cost unknown" (which excludes the holding from cost basis).
+  if (body.acquired_price_usd !== undefined) {
+    if (body.acquired_price_usd === null) {
+      update.acquired_price_usd = null
+    } else {
+      const n = Number(body.acquired_price_usd)
+      if (!Number.isFinite(n) || n < 0) {
+        return NextResponse.json({ error: 'acquired_price_usd must be a non-negative number' }, { status: 400 })
+      }
+      update.acquired_price_usd = n
+    }
+  }
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
   }

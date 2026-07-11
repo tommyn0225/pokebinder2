@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { finishPrice } from '@/lib/holdingValue'
 import type { Card } from '@/types/card'
 
 export async function GET(
@@ -24,7 +25,7 @@ export async function GET(
 
   const { data, error } = await supabase
     .from('holdings')
-    .select('id, binder_id, user_id, card_id, game, quantity, finish, for_trade, card_data, created_at')
+    .select('id, binder_id, user_id, card_id, game, quantity, finish, for_trade, acquired_price_usd, acquired_at, card_data, created_at')
     .eq('binder_id', id)
     .order('created_at', { ascending: true })
 
@@ -52,12 +53,13 @@ export async function POST(
   if (!binder) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const body = await request.json()
-  const { card_id, game, quantity, card_data, finish: finishRaw } = body as {
+  const { card_id, game, quantity, card_data, finish: finishRaw, acquired_price_usd: acquiredRaw } = body as {
     card_id: string
     game: string
     quantity: number
     card_data: Card
     finish?: string
+    acquired_price_usd?: number | null
   }
 
   if (!card_id || !game || !card_data) {
@@ -78,6 +80,22 @@ export async function POST(
     return NextResponse.json({ error: 'finish must be nonfoil or foil' }, { status: 400 })
   }
   const finish = finishRaw === 'foil' ? 'foil' : 'nonfoil'
+
+  // Cost basis (approach A): default what-you-paid to the card's current
+  // finish-appropriate price so gain starts near zero and tracks the market;
+  // the user can correct it later. An explicit value from the client wins.
+  let acquired_price_usd: number | null
+  if (acquiredRaw === undefined) {
+    acquired_price_usd = finishPrice(finish, card_data.price)
+  } else if (acquiredRaw === null) {
+    acquired_price_usd = null
+  } else {
+    const n = Number(acquiredRaw)
+    if (!Number.isFinite(n) || n < 0) {
+      return NextResponse.json({ error: 'acquired_price_usd must be a non-negative number' }, { status: 400 })
+    }
+    acquired_price_usd = n
+  }
 
   const qty = Math.max(1, Math.floor(Number(quantity) || 1))
 
@@ -104,7 +122,7 @@ export async function POST(
 
   const { data, error } = await supabase
     .from('holdings')
-    .insert({ binder_id: id, user_id: user.id, card_id, game, quantity: qty, finish, card_data })
+    .insert({ binder_id: id, user_id: user.id, card_id, game, quantity: qty, finish, acquired_price_usd, card_data })
     .select()
     .single()
 

@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import BinderList from './BinderList'
 import ValueChart from '@/components/ValueChart'
-import { holdingUnitPrice } from '@/lib/holdingValue'
+import { holdingUnitPrice, summarizeGain } from '@/lib/holdingValue'
 import type { Binder } from '@/types/binder'
 import type { Holding } from '@/types/holding'
 
@@ -20,19 +20,21 @@ export default async function DashboardPage() {
       .order('created_at', { ascending: true }),
     supabase
       .from('holdings')
-      .select('binder_id, quantity, finish, card_data')
+      .select('binder_id, quantity, finish, acquired_price_usd, card_data')
       .eq('user_id', user.id),
   ])
 
+  const heldCards = (holdings ?? []) as Pick<Holding, 'binder_id' | 'quantity' | 'finish' | 'acquired_price_usd' | 'card_data'>[]
   const binderValueMap = new Map<string, number>()
   let totalUsd = 0
   let totalCards = 0
-  for (const h of (holdings ?? []) as Pick<Holding, 'binder_id' | 'quantity' | 'finish' | 'card_data'>[]) {
+  for (const h of heldCards) {
     const value = holdingUnitPrice(h) * h.quantity
     binderValueMap.set(h.binder_id, (binderValueMap.get(h.binder_id) ?? 0) + value)
     totalUsd += value
     totalCards += h.quantity
   }
+  const gain = summarizeGain(heldCards)
 
   const bindersWithValue = ((binders ?? []) as (Binder & { is_public: boolean })[]).map(b => ({
     ...b,
@@ -60,6 +62,16 @@ export default async function DashboardPage() {
         <div className="px-5 py-4">
           <p className="microlabel text-muted">Total value</p>
           <p className="mt-1 font-mono text-2xl text-ink">${totalUsd.toFixed(2)}</p>
+          {gain.costed_count > 0 && (
+            <p className={`mt-0.5 font-mono text-xs ${
+              gain.gain > 0 ? 'text-emerald-600 dark:text-emerald-400'
+                : gain.gain < 0 ? 'text-red-600 dark:text-red-400'
+                : 'text-muted'
+            }`}>
+              {gain.gain >= 0 ? '+' : '−'}${Math.abs(gain.gain).toFixed(2)}
+              {gain.gain_pct != null ? ` (${gain.gain >= 0 ? '+' : '−'}${Math.abs(gain.gain_pct * 100).toFixed(1)}%)` : ''}
+            </p>
+          )}
         </div>
         <div className="px-5 py-4">
           <p className="microlabel text-muted">Cards</p>

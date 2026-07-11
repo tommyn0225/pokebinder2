@@ -11,6 +11,8 @@ export interface Holding {
   quantity: number
   finish: Finish
   for_trade: boolean
+  acquired_price_usd: number | null
+  acquired_at: string
   card_data: Card
   created_at: string
 }
