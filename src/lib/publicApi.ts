@@ -1,4 +1,5 @@
 import type { Card } from '@/types/card'
+import type { Finish } from '@/types/holding'
 
 // Attribution is a license condition of our upstream sources and must ride along
 // with every public API response (see CLAUDE.md "Respect upstream terms").
@@ -29,12 +30,13 @@ export interface ApiCard {
   rarity: string | null
   image_url: string | null
   quantity: number
+  finish: Finish
   for_trade?: boolean
   price: Card['price']
 }
 
 export function serializeHolding(
-  h: { quantity: number; for_trade?: boolean; card_data: Card },
+  h: { quantity: number; finish?: Finish; for_trade?: boolean; card_data: Card },
   opts: { includeForTrade?: boolean } = {}
 ): ApiCard {
   const c = h.card_data
@@ -48,15 +50,16 @@ export function serializeHolding(
     rarity: c.rarity,
     image_url: c.image_url,
     quantity: h.quantity,
+    finish: h.finish ?? 'nonfoil',
     price: c.price,
   }
   if (opts.includeForTrade) card.for_trade = h.for_trade ?? false
   return card
 }
 
-// A catalog entry is a card without holding context (no quantity/for_trade):
-// the catalog spans all users, so per-holding fields must not leak through it.
-export type CatalogCard = Omit<ApiCard, 'quantity' | 'for_trade'>
+// A catalog entry is a card without holding context (no quantity/finish/
+// for_trade): the catalog spans all users, so per-holding fields must not leak.
+export type CatalogCard = Omit<ApiCard, 'quantity' | 'finish' | 'for_trade'>
 
 export function serializeCard(c: Card): CatalogCard {
   return {

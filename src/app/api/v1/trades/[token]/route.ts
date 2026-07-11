@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { ATTRIBUTION, V1_HEADERS, serializeHolding } from '@/lib/publicApi'
 import type { Card } from '@/types/card'
+import type { Finish } from '@/types/holding'
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: V1_HEADERS })
@@ -29,12 +30,12 @@ export async function GET(
 
   const { data: holdings } = await supabase
     .from('holdings')
-    .select('quantity, card_data')
+    .select('quantity, finish, card_data')
     .eq('user_id', tradeList.user_id)
     .eq('for_trade', true)
     .order('created_at', { ascending: true })
 
-  const list = (holdings ?? []) as { quantity: number; card_data: Card }[]
+  const list = (holdings ?? []) as { quantity: number; finish: Finish; card_data: Card }[]
   const total_cards = list.reduce((n, h) => n + h.quantity, 0)
 
   return NextResponse.json(

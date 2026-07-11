@@ -2,23 +2,21 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import TradeShareControl from './TradeShareControl'
+import { finishPrice } from '@/lib/holdingValue'
 import type { Card } from '@/types/card'
+import type { Finish } from '@/types/holding'
 
-const GAME_LABELS: Record<string, string> = {
-  mtg: 'MTG',
-  pokemon: 'Pokémon',
-  onepiece: 'One Piece',
-}
-
-function priceDisplay(card: Card): string {
-  if (card.price.usd != null) return `$${card.price.usd.toFixed(2)}`
-  if (card.price.eur != null) return `€${card.price.eur.toFixed(2)}`
+function priceDisplay(h: { finish: Finish; card_data: Card }): string {
+  const usd = finishPrice(h.finish, h.card_data.price)
+  if (usd != null) return `$${usd.toFixed(2)}`
+  if (h.card_data.price.eur != null) return `€${h.card_data.price.eur.toFixed(2)}`
   return '—'
 }
 
 interface TradeHolding {
   id: string
   quantity: number
+  finish: Finish
   binder_id: string
   card_data: Card
   binders: { name: string; game: string } | null
@@ -36,7 +34,7 @@ export default async function TradesPage() {
   const [{ data }, { data: tradeList }] = await Promise.all([
     supabase
       .from('holdings')
-      .select('id, quantity, binder_id, card_data, binders(name, game)')
+      .select('id, quantity, finish, binder_id, card_data, binders(name, game)')
       .eq('user_id', user.id)
       .eq('for_trade', true)
       .order('created_at', { ascending: true }),
@@ -105,7 +103,14 @@ export default async function TradesPage() {
                 <p className="text-xs font-semibold leading-tight line-clamp-2 text-ink">{h.card_data.name}</p>
                 <p className="text-xs text-muted truncate">{h.card_data.set_name}</p>
                 <div className="mt-auto pt-1 flex items-center justify-between gap-2">
-                  <span className="text-sm font-semibold text-ink">{priceDisplay(h.card_data)}</span>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-sm font-semibold text-ink">{priceDisplay(h)}</span>
+                    {h.finish === 'foil' && (
+                      <span className="microlabel rounded border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 px-1 py-0.5">
+                        Foil
+                      </span>
+                    )}
+                  </div>
                   {h.binders && (
                     <Link
                       href={`/binders/${h.binder_id}`}

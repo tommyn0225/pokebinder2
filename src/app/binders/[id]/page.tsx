@@ -24,7 +24,7 @@ export default async function BinderPage({ params }: { params: Promise<{ id: str
 
   const { data: holdings } = await supabase
     .from('holdings')
-    .select('id, binder_id, user_id, card_id, game, quantity, for_trade, card_data, created_at')
+    .select('id, binder_id, user_id, card_id, game, quantity, finish, for_trade, card_data, created_at')
     .eq('binder_id', id)
     .order('created_at', { ascending: true })
 

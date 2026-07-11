@@ -1,14 +1,15 @@
 import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/service'
-import type { Card } from '@/types/card'
+import { finishPrice } from '@/lib/holdingValue'
 import type { Holding } from '@/types/holding'
 
 // Visibility can be flipped at any time, so never cache.
 export const dynamic = 'force-dynamic'
 
-function priceDisplay(card: Card): string {
-  if (card.price.usd != null) return `$${card.price.usd.toFixed(2)}`
-  if (card.price.eur != null) return `€${card.price.eur.toFixed(2)}`
+function priceDisplay(h: Pick<Holding, 'finish' | 'card_data'>): string {
+  const usd = finishPrice(h.finish, h.card_data.price)
+  if (usd != null) return `$${usd.toFixed(2)}`
+  if (h.card_data.price.eur != null) return `€${h.card_data.price.eur.toFixed(2)}`
   return '—'
 }
 
@@ -29,7 +30,7 @@ function Message({ title, body }: { title: string; body: string }) {
   )
 }
 
-type PublicTradeHolding = Pick<Holding, 'id' | 'quantity' | 'card_data'>
+type PublicTradeHolding = Pick<Holding, 'id' | 'quantity' | 'finish' | 'card_data'>
 
 export default async function PublicTradeListPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
@@ -52,7 +53,7 @@ export default async function PublicTradeListPage({ params }: { params: Promise<
 
   const { data: holdings } = await supabase
     .from('holdings')
-    .select('id, quantity, card_data')
+    .select('id, quantity, finish, card_data')
     .eq('user_id', tradeList.user_id)
     .eq('for_trade', true)
     .order('created_at', { ascending: true })
@@ -98,8 +99,13 @@ export default async function PublicTradeListPage({ params }: { params: Promise<
               <div className="p-2 flex flex-col gap-1 flex-1">
                 <p className="text-xs font-semibold leading-tight line-clamp-2 text-ink">{h.card_data.name}</p>
                 <p className="text-xs text-muted truncate">{h.card_data.set_name}</p>
-                <div className="mt-auto pt-1">
-                  <span className="text-sm font-semibold text-ink">{priceDisplay(h.card_data)}</span>
+                <div className="mt-auto pt-1 flex items-center gap-1.5">
+                  <span className="text-sm font-semibold text-ink">{priceDisplay(h)}</span>
+                  {h.finish === 'foil' && (
+                    <span className="microlabel rounded border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 px-1 py-0.5">
+                      Foil
+                    </span>
+                  )}
                 </div>
               </div>
             </li>

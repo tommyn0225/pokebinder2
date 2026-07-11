@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import BinderList from './BinderList'
 import ValueChart from '@/components/ValueChart'
+import { holdingUnitPrice } from '@/lib/holdingValue'
 import type { Binder } from '@/types/binder'
 import type { Holding } from '@/types/holding'
 
@@ -19,15 +20,15 @@ export default async function DashboardPage() {
       .order('created_at', { ascending: true }),
     supabase
       .from('holdings')
-      .select('binder_id, quantity, card_data')
+      .select('binder_id, quantity, finish, card_data')
       .eq('user_id', user.id),
   ])
 
   const binderValueMap = new Map<string, number>()
   let totalUsd = 0
   let totalCards = 0
-  for (const h of (holdings ?? []) as Pick<Holding, 'binder_id' | 'quantity' | 'card_data'>[]) {
-    const value = (h.card_data.price.usd ?? 0) * h.quantity
+  for (const h of (holdings ?? []) as Pick<Holding, 'binder_id' | 'quantity' | 'finish' | 'card_data'>[]) {
+    const value = holdingUnitPrice(h) * h.quantity
     binderValueMap.set(h.binder_id, (binderValueMap.get(h.binder_id) ?? 0) + value)
     totalUsd += value
     totalCards += h.quantity

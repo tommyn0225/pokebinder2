@@ -24,7 +24,7 @@ export async function GET(
 
   const { data, error } = await supabase
     .from('holdings')
-    .select('id, binder_id, user_id, card_id, game, quantity, for_trade, card_data, created_at')
+    .select('id, binder_id, user_id, card_id, game, quantity, finish, for_trade, card_data, created_at')
     .eq('binder_id', id)
     .order('created_at', { ascending: true })
 
@@ -52,25 +52,33 @@ export async function POST(
   if (!binder) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const body = await request.json()
-  const { card_id, game, quantity, card_data } = body as {
+  const { card_id, game, quantity, card_data, finish: finishRaw } = body as {
     card_id: string
     game: string
     quantity: number
     card_data: Card
+    finish?: string
   }
 
   if (!card_id || !game || !card_data) {
     return NextResponse.json({ error: 'card_id, game, and card_data are required' }, { status: 400 })
   }
 
+  if (finishRaw !== undefined && finishRaw !== 'nonfoil' && finishRaw !== 'foil') {
+    return NextResponse.json({ error: 'finish must be nonfoil or foil' }, { status: 400 })
+  }
+  const finish = finishRaw === 'foil' ? 'foil' : 'nonfoil'
+
   const qty = Math.max(1, Math.floor(Number(quantity) || 1))
 
-  // Upsert: if card already exists in binder, increment quantity
+  // Upsert: the same card in a different finish is a separate stack, so an
+  // existing row is matched on card_id + finish, not card_id alone.
   const { data: existing } = await supabase
     .from('holdings')
     .select('id, quantity')
     .eq('binder_id', id)
     .eq('card_id', card_id)
+    .eq('finish', finish)
     .single()
 
   if (existing) {
@@ -86,7 +94,7 @@ export async function POST(
 
   const { data, error } = await supabase
     .from('holdings')
-    .insert({ binder_id: id, user_id: user.id, card_id, game, quantity: qty, card_data })
+    .insert({ binder_id: id, user_id: user.id, card_id, game, quantity: qty, finish, card_data })
     .select()
     .single()
 

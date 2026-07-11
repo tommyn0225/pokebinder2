@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { holdingUnitPrice } from '@/lib/holdingValue'
 import type { Holding } from '@/types/holding'
 
 export async function GET() {
@@ -16,7 +17,7 @@ export async function GET() {
 
   const { data: holdings, error: holdingsError } = await supabase
     .from('holdings')
-    .select('binder_id, quantity, card_data')
+    .select('binder_id, quantity, finish, card_data')
     .eq('user_id', user.id)
 
   if (holdingsError) return NextResponse.json({ error: holdingsError.message }, { status: 500 })
@@ -24,8 +25,8 @@ export async function GET() {
   const byBinder = new Map<string, number>()
   let total_usd = 0
 
-  for (const h of holdings as Pick<Holding, 'binder_id' | 'quantity' | 'card_data'>[]) {
-    const value = (h.card_data.price.usd ?? 0) * h.quantity
+  for (const h of holdings as Pick<Holding, 'binder_id' | 'quantity' | 'finish' | 'card_data'>[]) {
+    const value = holdingUnitPrice(h) * h.quantity
     byBinder.set(h.binder_id, (byBinder.get(h.binder_id) ?? 0) + value)
     total_usd += value
   }

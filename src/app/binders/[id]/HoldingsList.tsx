@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import type { Holding } from '@/types/holding'
+import type { Finish, Holding } from '@/types/holding'
 import type { Card, CardSearchResult } from '@/types/card'
 import type { Binder } from '@/types/binder'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
+import { finishPrice, holdingUnitPrice } from '@/lib/holdingValue'
 import { useToast } from '@/components/Toast'
 
 type GameKey = Binder['game']
@@ -20,6 +21,22 @@ function priceDisplay(card: Card): string {
   if (card.price.usd != null) return `$${card.price.usd.toFixed(2)}`
   if (card.price.eur != null) return `€${card.price.eur.toFixed(2)}`
   return '—'
+}
+
+// A holding's displayed price honors its finish (foil values against usd_foil).
+function holdingPriceDisplay(h: Holding): string {
+  const usd = finishPrice(h.finish, h.card_data.price)
+  if (usd != null) return `$${usd.toFixed(2)}`
+  if (h.card_data.price.eur != null) return `€${h.card_data.price.eur.toFixed(2)}`
+  return '—'
+}
+
+function FoilTag() {
+  return (
+    <span className="microlabel rounded border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 px-1 py-0.5">
+      Foil
+    </span>
+  )
 }
 
 function QtyStepper({ quantity, name, onChange }: { quantity: number; name: string; onChange: (q: number) => void }) {
@@ -70,6 +87,8 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
   const [adding,    setAdding]  = useState<string | null>(null)
   const [addOpen,   setAddOpen] = useState(true)
   const [view,      setView]    = useState<ViewMode>('list')
+  // Per-result foil choice, keyed by card id; absent means nonfoil.
+  const [foilSel,   setFoilSel] = useState<Record<string, boolean>>({})
   const toast = useToast()
 
   const search = useCallback(async (q: string) => {
@@ -95,21 +114,23 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
   }, [debouncedQuery, search])
 
   async function handleAdd(card: Card) {
+    const finish: Finish = foilSel[card.id] ? 'foil' : 'nonfoil'
     setAdding(card.id)
     const res = await fetch(`/api/binders/${binderId}/holdings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ card_id: card.id, game: card.game, quantity: 1, card_data: card }),
+      body: JSON.stringify({ card_id: card.id, game: card.game, quantity: 1, finish, card_data: card }),
     })
     const json = await res.json()
     if (!res.ok) toast(json.error ?? 'Failed to add card', 'error')
     else {
+      // A different finish of the same card is its own stack, so match on both.
       setHoldings(prev => {
-        const idx = prev.findIndex(h => h.card_id === card.id)
+        const idx = prev.findIndex(h => h.card_id === card.id && h.finish === finish)
         if (idx >= 0) { const next = [...prev]; next[idx] = json; return next }
         return [...prev, json]
       })
-      toast(`Added ${card.name}`, 'success')
+      toast(`Added ${card.name}${finish === 'foil' ? ' (foil)' : ''}`, 'success')
     }
     setAdding(null)
   }
@@ -143,7 +164,7 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
     else setHoldings(prev => prev.filter(h => h.id !== holdingId))
   }
 
-  const totalValue = holdings.reduce((sum, h) => sum + (h.card_data.price.usd ?? 0) * h.quantity, 0)
+  const totalValue = holdings.reduce((sum, h) => sum + holdingUnitPrice(h) * h.quantity, 0)
   const placeholder = PLACEHOLDERS[binderGame] ?? 'Search cards…'
 
   return (
@@ -184,14 +205,42 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
 
             {results.length > 0 && (
               <ul className="rounded-md border border-line divide-y divide-line bg-surface max-h-72 overflow-y-auto">
-                {results.map(card => (
+                {results.map(card => {
+                  const finish: Finish = foilSel[card.id] ? 'foil' : 'nonfoil'
+                  // Show the foil price when we have one, otherwise fall back to
+                  // the card's normal price display (foil still marks the copy).
+                  const priceStr =
+                    finish === 'foil' && card.price.usd_foil != null
+                      ? `$${card.price.usd_foil.toFixed(2)}`
+                      : priceDisplay(card)
+                  return (
                   <li key={card.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-background transition-colors">
                     {card.image_url && (
                       <img src={card.image_url} alt={card.name} loading="lazy" width={32} height={44} className="w-8 h-11 object-cover rounded" />
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-ink truncate">{card.name}</p>
-                      <p className="text-xs text-muted">{card.set_name} · {priceDisplay(card)}</p>
+                      <p className="text-xs text-muted">{card.set_name} · {priceStr}</p>
+                    </div>
+                    {/* Finish selector — always shown, defaults to Normal */}
+                    <div
+                      role="group"
+                      aria-label={`Finish for ${card.name}`}
+                      className="flex shrink-0 divide-x divide-line rounded-md border border-line overflow-hidden"
+                    >
+                      {(['nonfoil', 'foil'] as Finish[]).map(f => (
+                        <button
+                          key={f}
+                          type="button"
+                          onClick={() => setFoilSel(s => ({ ...s, [card.id]: f === 'foil' }))}
+                          aria-pressed={finish === f}
+                          className={`microlabel px-2.5 py-1.5 transition-colors ${
+                            finish === f ? 'bg-brand text-brand-contrast' : 'bg-surface text-muted hover:text-ink'
+                          }`}
+                        >
+                          {f === 'foil' ? 'Foil' : 'Normal'}
+                        </button>
+                      ))}
                     </div>
                     <button
                       onClick={() => handleAdd(card)}
@@ -201,7 +250,8 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
                       {adding === card.id ? 'Adding…' : '+ Add'}
                     </button>
                   </li>
-                ))}
+                  )
+                })}
               </ul>
             )}
           </div>
@@ -258,9 +308,12 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
                 </div>
                 <div className="p-2 flex flex-col gap-1.5 flex-1">
                   <p className="text-xs font-semibold leading-tight line-clamp-2 text-ink">{h.card_data.name}</p>
-                  <p className="text-xs text-muted truncate">{h.card_data.set_name}</p>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <p className="text-xs text-muted truncate">{h.card_data.set_name}</p>
+                    {h.finish === 'foil' && <FoilTag />}
+                  </div>
                   <div className="mt-auto pt-1 flex items-center justify-between">
-                    <span className="font-mono text-sm text-ink">{priceDisplay(h.card_data)}</span>
+                    <span className="font-mono text-sm text-ink">{holdingPriceDisplay(h)}</span>
                     <QtyStepper quantity={h.quantity} name={h.card_data.name} onChange={q => handleQuantityChange(h.id, q)} />
                   </div>
                   <div className="flex items-center justify-between gap-2 pt-1">
@@ -287,10 +340,13 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
                   <img src={h.card_data.image_url} alt={h.card_data.name} loading="lazy" width={48} height={66} className="w-12 h-16 object-cover rounded shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-ink truncate">{h.card_data.name}</p>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <p className="font-medium text-ink truncate">{h.card_data.name}</p>
+                    {h.finish === 'foil' && <FoilTag />}
+                  </div>
                   <p className="text-xs text-muted truncate mt-0.5">{h.card_data.set_name}</p>
                   <div className="mt-2 flex items-center justify-between gap-2">
-                    <span className="font-mono text-sm text-ink">{priceDisplay(h.card_data)}</span>
+                    <span className="font-mono text-sm text-ink">{holdingPriceDisplay(h)}</span>
                     <QtyStepper quantity={h.quantity} name={h.card_data.name} onChange={q => handleQuantityChange(h.id, q)} />
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-2">
@@ -328,10 +384,11 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
                         <img src={h.card_data.image_url} alt={h.card_data.name} loading="lazy" width={32} height={44} className="w-8 h-11 object-cover rounded" />
                       )}
                       <span className="font-medium text-ink">{h.card_data.name}</span>
+                      {h.finish === 'foil' && <FoilTag />}
                     </div>
                   </td>
                   <td className="px-5 py-3 text-muted">{h.card_data.set_name}</td>
-                  <td className="px-5 py-3 text-right text-ink">{priceDisplay(h.card_data)}</td>
+                  <td className="px-5 py-3 text-right text-ink">{holdingPriceDisplay(h)}</td>
                   <td className="px-5 py-3">
                     <div className="flex justify-center">
                       <QtyStepper quantity={h.quantity} name={h.card_data.name} onChange={q => handleQuantityChange(h.id, q)} />

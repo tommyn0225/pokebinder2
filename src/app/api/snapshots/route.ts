@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { scryfallAdapter } from '@/lib/adapters/scryfall'
 import { pokewalletAdapter } from '@/lib/adapters/pokewallet'
 import { optcgAdapter } from '@/lib/adapters/optcg'
+import { finishPrice } from '@/lib/holdingValue'
 import type { Card, GameAdapter } from '@/types/card'
 
 const ADAPTERS: Record<string, GameAdapter> = {
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
   // Fetch all holdings across all users
   const { data: holdings, error } = await supabase
     .from('holdings')
-    .select('id, card_id, game')
+    .select('id, card_id, game, finish')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!holdings || holdings.length === 0) {
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
   }
 
   // Deduplicate by game+card_id to minimize API calls
-  type HoldingRow = { id: string; card_id: string; game: string }
+  type HoldingRow = { id: string; card_id: string; game: string; finish: string }
   const unique = new Map<string, { card_id: string; game: string }>()
   for (const h of holdings as HoldingRow[]) {
     unique.set(`${h.game}:${h.card_id}`, { card_id: h.card_id, game: h.game })
@@ -65,13 +66,16 @@ export async function POST(request: Request) {
 
   // Build snapshot rows
   const now = new Date().toISOString()
-  const rows = (holdings as HoldingRow[]).map(h => ({
-    holding_id: h.id,
-    card_id: h.card_id,
-    game: h.game,
-    price_usd: cardMap.get(`${h.game}:${h.card_id}`)?.price.usd ?? null,
-    snapshotted_at: now,
-  }))
+  const rows = (holdings as HoldingRow[]).map(h => {
+    const card = cardMap.get(`${h.game}:${h.card_id}`)
+    return {
+      holding_id: h.id,
+      card_id: h.card_id,
+      game: h.game,
+      price_usd: card ? finishPrice(h.finish, card.price) : null,
+      snapshotted_at: now,
+    }
+  })
 
   const { error: insertError } = await supabase.from('price_snapshots').insert(rows)
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })

@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/service'
-import type { Card } from '@/types/card'
+import { finishPrice, holdingUnitPrice } from '@/lib/holdingValue'
 import type { Holding } from '@/types/holding'
 
 // Public state depends on the binder's live is_public flag, so never cache.
@@ -12,9 +12,10 @@ const GAME_LABELS: Record<string, string> = {
   onepiece: 'One Piece',
 }
 
-function priceDisplay(card: Card): string {
-  if (card.price.usd != null) return `$${card.price.usd.toFixed(2)}`
-  if (card.price.eur != null) return `€${card.price.eur.toFixed(2)}`
+function priceDisplay(h: Pick<Holding, 'finish' | 'card_data'>): string {
+  const usd = finishPrice(h.finish, h.card_data.price)
+  if (usd != null) return `$${usd.toFixed(2)}`
+  if (h.card_data.price.eur != null) return `€${h.card_data.price.eur.toFixed(2)}`
   return '—'
 }
 
@@ -35,7 +36,7 @@ function Message({ title, body }: { title: string; body: string }) {
   )
 }
 
-type PublicHolding = Pick<Holding, 'id' | 'quantity' | 'for_trade' | 'card_data'>
+type PublicHolding = Pick<Holding, 'id' | 'quantity' | 'finish' | 'for_trade' | 'card_data'>
 
 export default async function PublicBinderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -58,7 +59,7 @@ export default async function PublicBinderPage({ params }: { params: Promise<{ i
 
   const { data: holdings } = await supabase
     .from('holdings')
-    .select('id, quantity, for_trade, card_data')
+    .select('id, quantity, finish, for_trade, card_data')
     .eq('binder_id', id)
     .order('created_at', { ascending: true })
 
@@ -66,7 +67,7 @@ export default async function PublicBinderPage({ params }: { params: Promise<{ i
   let totalUsd = 0
   let totalCards = 0
   for (const h of list) {
-    totalUsd += (h.card_data.price.usd ?? 0) * h.quantity
+    totalUsd += holdingUnitPrice(h) * h.quantity
     totalCards += h.quantity
   }
   const tradeCount = list.filter(h => h.for_trade).reduce((n, h) => n + h.quantity, 0)
@@ -133,8 +134,13 @@ export default async function PublicBinderPage({ params }: { params: Promise<{ i
               <div className="p-2 flex flex-col gap-1 flex-1">
                 <p className="text-xs font-semibold leading-tight line-clamp-2 text-ink">{h.card_data.name}</p>
                 <p className="text-xs text-muted truncate">{h.card_data.set_name}</p>
-                <div className="mt-auto pt-1">
-                  <span className="text-sm font-semibold text-ink">{priceDisplay(h.card_data)}</span>
+                <div className="mt-auto pt-1 flex items-center gap-1.5">
+                  <span className="text-sm font-semibold text-ink">{priceDisplay(h)}</span>
+                  {h.finish === 'foil' && (
+                    <span className="microlabel rounded border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 px-1 py-0.5">
+                      Foil
+                    </span>
+                  )}
                 </div>
               </div>
             </li>

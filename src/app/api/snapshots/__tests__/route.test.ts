@@ -16,7 +16,7 @@ type InsertCall = { table: string; rows: Array<Record<string, unknown>> }
 
 // Minimal chainable fake of the Supabase query builder. select() resolves with
 // the seeded holdings; update()/insert() record their calls for assertions.
-function makeFakeSupabase(holdings: Array<{ id: string; card_id: string; game: string }>) {
+function makeFakeSupabase(holdings: Array<{ id: string; card_id: string; game: string; finish?: string }>) {
   const updates: UpdateCall[] = []
   const inserts: InsertCall[] = []
 
@@ -52,7 +52,7 @@ function makeFakeSupabase(holdings: Array<{ id: string; card_id: string; game: s
   return { from: (table: string) => query(table), updates, inserts }
 }
 
-function freshCard(price: number): Card {
+function freshCard(usd: number, usd_foil: number | null = null): Card {
   return {
     id: 'abc-123',
     game: 'mtg',
@@ -63,7 +63,7 @@ function freshCard(price: number): Card {
     image_url: 'https://img/bolt.jpg',
     type_line: 'Instant',
     rarity: 'common',
-    price: { usd: price, usd_foil: null, eur: null },
+    price: { usd, usd_foil, eur: null },
   }
 }
 
@@ -111,6 +111,22 @@ describe('snapshot job', () => {
     expect(fake.inserts).toHaveLength(1)
     expect(fake.inserts[0].table).toBe('price_snapshots')
     expect(fake.inserts[0].rows.map(r => r.price_usd)).toEqual([5, 5])
+  })
+
+  it('records the foil price for a foil holding and the nonfoil price otherwise', async () => {
+    // Same card held in both finishes → one card fetch, but each snapshot row
+    // must carry the price matching its own finish.
+    const holdings = [
+      { id: 'h1', card_id: 'abc-123', game: 'mtg', finish: 'nonfoil' },
+      { id: 'h2', card_id: 'abc-123', game: 'mtg', finish: 'foil' },
+    ]
+    const fake = makeFakeSupabase(holdings)
+    vi.mocked(createServiceClient).mockReturnValue(fake as never)
+    vi.mocked(scryfallAdapter.getById).mockResolvedValue(freshCard(5, 20))
+
+    await POST(postRequest())
+
+    expect(fake.inserts[0].rows.map(r => r.price_usd)).toEqual([5, 20])
   })
 
   it('skips the card_data writeback when the upstream fetch fails', async () => {

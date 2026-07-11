@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { ATTRIBUTION, V1_HEADERS, serializeHolding } from '@/lib/publicApi'
+import { holdingUnitPrice } from '@/lib/holdingValue'
 import type { Card } from '@/types/card'
+import type { Finish } from '@/types/holding'
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: V1_HEADERS })
@@ -31,15 +33,15 @@ export async function GET(
 
   const { data: holdings } = await supabase
     .from('holdings')
-    .select('quantity, for_trade, card_data')
+    .select('quantity, finish, for_trade, card_data')
     .eq('binder_id', id)
     .order('created_at', { ascending: true })
 
-  const list = (holdings ?? []) as { quantity: number; for_trade: boolean; card_data: Card }[]
+  const list = (holdings ?? []) as { quantity: number; finish: Finish; for_trade: boolean; card_data: Card }[]
   let total_usd = 0
   let card_count = 0
   for (const h of list) {
-    total_usd += (h.card_data.price.usd ?? 0) * h.quantity
+    total_usd += holdingUnitPrice(h) * h.quantity
     card_count += h.quantity
   }
 
