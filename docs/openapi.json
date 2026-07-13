@@ -237,6 +237,54 @@
         }
       }
     },
+    "/api/v1/cards/{game}/{id}/history": {
+      "get": {
+        "tags": ["Cards"],
+        "summary": "Get a catalog card's price history",
+        "description": "Returns Binder's own daily USD price history for one catalog card, built from our snapshots (not upstream history), one point per day. Use `days` to bound the window. Returns 404 if no Binder user tracks the card.",
+        "operationId": "getCardHistory",
+        "parameters": [
+          {
+            "name": "game",
+            "in": "path",
+            "required": true,
+            "schema": { "$ref": "#/components/schemas/Game" }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The card's upstream id (Scryfall UUID, PokéWallet card id, or OPTCG card id).",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "description": "Size of the history window in days (1–365).",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 365, "default": 30 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daily price history for the card.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CardHistoryResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "Card not found in catalog.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/openapi.json": {
       "get": {
         "tags": ["Meta"],
@@ -368,6 +416,20 @@
           "attribution": { "type": "string" }
         },
         "required": ["card", "history", "attribution"]
+      },
+      "CardHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "game": { "$ref": "#/components/schemas/Game" },
+          "card_id": { "type": "string" },
+          "days": { "type": "integer", "description": "The requested window size in days." },
+          "history": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PricePoint" }
+          },
+          "attribution": { "type": "string" }
+        },
+        "required": ["game", "card_id", "days", "history", "attribution"]
       },
       "HistoryPoint": {
         "type": "object",

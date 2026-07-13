@@ -160,6 +160,28 @@ A card no Binder user tracks returns `404`:
 { "error": { "code": "not_found", "message": "Card not found in catalog" } }
 ```
 
+## 7. Get a card's price history over a window
+
+Binder's own daily snapshots for one card, bounded by `days` (default 30, max
+365) — one point per day:
+
+```bash
+curl "http://localhost:3000/api/v1/cards/pokemon/base1-4/history?days=7"
+```
+
+```json
+{
+  "game": "pokemon",
+  "card_id": "base1-4",
+  "days": 7,
+  "history": [
+    { "day": "2026-07-07", "price_usd": 298.0 },
+    { "day": "2026-07-08", "price_usd": 300.0 }
+  ],
+  "attribution": "…"
+}
+```
+
 ## Notes
 
 - Every error uses the envelope `{ "error": { "code", "message" } }`. Codes:
