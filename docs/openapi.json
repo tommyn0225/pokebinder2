@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Binder Public API",
-    "version": "1.1.0",
-    "description": "Read-only access to Binder's own value-added layer: public binders (holdings and valuation), a binder's price history, public trade lists, and Binder's normalized card catalog.\n\nThe catalog covers every card tracked in Binder, in our normalized cross-game model, with a per-card price history built from our own daily snapshots. It is enough to build a collection app of your own on top of. This API deliberately does not expose a live upstream card or price search passthrough. Card data and pricing come from Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece); every response includes an `attribution` field crediting them.\n\nNo authentication is required. Only resources their owner has explicitly made public are reachable; everything else returns 404.",
+    "version": "1.2.0",
+    "description": "Read-only access to Binder's own value-added layer: public binders (holdings and valuation), a binder's price history, public trade lists, and Binder's normalized card catalog.\n\nThe catalog covers every card tracked in Binder, in our normalized cross-game model, with a per-card price history built from our own daily snapshots. It is enough to build a collection app of your own on top of. This API deliberately does not expose a live upstream card or price search passthrough. Card data and pricing come from Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece); every response includes an `attribution` field crediting them.\n\nNo authentication is required. Only resources their owner has explicitly made public are reachable; everything else returns 404.\n\n**Errors** use one envelope: `{ \"error\": { \"code\": \"...\", \"message\": \"...\" } }`, where `code` is a stable machine-readable string.\n\n**Caching**: every GET returns a weak `ETag`; send it back as `If-None-Match` to get a `304 Not Modified` when the payload is unchanged.\n\n**Pagination**: `/api/v1/cards` is cursor-paginated — follow `next_cursor` until `has_more` is false.\n\n**Rate limiting**: requests are limited per IP (60 requests/minute). Over the limit returns `429` with a `Retry-After` header and error code `rate_limited`.",
     "contact": {
       "name": "Binder"
     }
@@ -151,13 +151,20 @@
             "name": "limit",
             "in": "query",
             "required": false,
-            "description": "Maximum number of cards to return (1–100).",
+            "description": "Maximum number of cards to return in this page (1–100).",
             "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque pagination cursor. Pass the `next_cursor` from the previous page to fetch the next one; omit for the first page.",
+            "schema": { "type": "string" }
           }
         ],
         "responses": {
           "200": {
-            "description": "Matching catalog cards, sorted by name.",
+            "description": "One page of matching catalog cards, ordered by name. Follow `next_cursor` while `has_more` is true.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/CardsResponse" }
@@ -165,7 +172,21 @@
             }
           },
           "400": {
-            "description": "Unknown game.",
+            "description": "Unknown game or invalid cursor.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (60 requests/minute per IP).",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying.",
+                "schema": { "type": "integer" }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/Error" }
@@ -262,10 +283,15 @@
           "rarity": { "type": "string", "nullable": true },
           "image_url": { "type": "string", "nullable": true },
           "quantity": { "type": "integer", "minimum": 1 },
+          "finish": {
+            "type": "string",
+            "enum": ["nonfoil", "foil"],
+            "description": "Which printing this holding is; foil values against price.usd_foil."
+          },
           "for_trade": { "type": "boolean", "description": "Present on binder responses; whether this holding is marked for trade." },
           "price": { "$ref": "#/components/schemas/Price" }
         },
-        "required": ["card_id", "name", "game", "set_name", "quantity", "price"]
+        "required": ["card_id", "name", "game", "set_name", "quantity", "finish", "price"]
       },
       "BinderResponse": {
         "type": "object",
@@ -308,14 +334,20 @@
       "CardsResponse": {
         "type": "object",
         "properties": {
-          "count": { "type": "integer" },
+          "count": { "type": "integer", "description": "Number of cards in THIS page (not the catalog total)." },
+          "has_more": { "type": "boolean", "description": "Whether another page exists." },
+          "next_cursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Cursor for the next page, or null when has_more is false."
+          },
           "cards": {
             "type": "array",
             "items": { "$ref": "#/components/schemas/CatalogCard" }
           },
           "attribution": { "type": "string" }
         },
-        "required": ["count", "cards", "attribution"]
+        "required": ["count", "has_more", "next_cursor", "cards", "attribution"]
       },
       "PricePoint": {
         "type": "object",
@@ -372,7 +404,18 @@
       "Error": {
         "type": "object",
         "properties": {
-          "error": { "type": "string" }
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": ["invalid_request", "not_found", "rate_limited", "internal"],
+                "description": "Stable machine-readable error code."
+              },
+              "message": { "type": "string", "description": "Human-readable detail; may change." }
+            },
+            "required": ["code", "message"]
+          }
         },
         "required": ["error"]
       }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { ATTRIBUTION, V1_HEADERS, serializeHolding } from '@/lib/publicApi'
+import { ATTRIBUTION, V1_HEADERS, serializeHolding, v1Error, v1Json } from '@/lib/publicApi'
 import { holdingUnitPrice } from '@/lib/holdingValue'
 import type { Card } from '@/types/card'
 import type { Finish } from '@/types/holding'
@@ -10,7 +10,7 @@ export async function OPTIONS() {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
@@ -25,10 +25,7 @@ export async function GET(
     .maybeSingle()
 
   if (!binder || !binder.is_public) {
-    return NextResponse.json(
-      { error: 'Binder not found or not public' },
-      { status: 404, headers: V1_HEADERS }
-    )
+    return v1Error(404, 'not_found', 'Binder not found or not public')
   }
 
   const { data: holdings } = await supabase
@@ -45,14 +42,11 @@ export async function GET(
     card_count += h.quantity
   }
 
-  return NextResponse.json(
-    {
-      binder: { id: binder.id, name: binder.name, game: binder.game },
-      card_count,
-      total_usd: Math.round(total_usd * 100) / 100,
-      holdings: list.map(h => serializeHolding(h, { includeForTrade: true })),
-      attribution: ATTRIBUTION,
-    },
-    { headers: V1_HEADERS }
-  )
+  return v1Json(request, {
+    binder: { id: binder.id, name: binder.name, game: binder.game },
+    card_count,
+    total_usd: Math.round(total_usd * 100) / 100,
+    holdings: list.map(h => serializeHolding(h, { includeForTrade: true })),
+    attribution: ATTRIBUTION,
+  })
 }

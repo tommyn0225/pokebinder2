@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { ATTRIBUTION, V1_HEADERS, isGame, serializeCard } from '@/lib/publicApi'
+import { ATTRIBUTION, V1_HEADERS, isGame, serializeCard, v1Error, v1Json } from '@/lib/publicApi'
 import type { Card } from '@/types/card'
 
 export async function OPTIONS() {
@@ -8,15 +8,12 @@ export async function OPTIONS() {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ game: string; id: string }> }
 ) {
   const { game, id } = await params
 
-  const notFound = NextResponse.json(
-    { error: 'Card not found in catalog' },
-    { status: 404, headers: V1_HEADERS }
-  )
+  const notFound = v1Error(404, 'not_found', 'Card not found in catalog')
   if (!isGame(game)) return notFound
 
   const supabase = createServiceClient()
@@ -47,12 +44,9 @@ export async function GET(
   }
   const history = [...byDay.entries()].map(([day, price_usd]) => ({ day, price_usd }))
 
-  return NextResponse.json(
-    {
-      card: serializeCard(holding.card_data as Card),
-      history,
-      attribution: ATTRIBUTION,
-    },
-    { headers: V1_HEADERS }
-  )
+  return v1Json(request, {
+    card: serializeCard(holding.card_data as Card),
+    history,
+    attribution: ATTRIBUTION,
+  })
 }

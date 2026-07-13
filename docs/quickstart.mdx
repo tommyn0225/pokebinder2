@@ -36,6 +36,7 @@ curl http://localhost:3000/api/v1/binders/<binder-id>
       "rarity": "common",
       "image_url": "https://…",
       "quantity": 2,
+      "finish": "nonfoil",
       "for_trade": true,
       "price": { "usd": 1.25, "usd_foil": 6.0, "eur": 1.1 }
     }
@@ -44,10 +45,10 @@ curl http://localhost:3000/api/v1/binders/<binder-id>
 }
 ```
 
-A missing or private binder returns `404`:
+A missing or private binder returns `404` with the standard error envelope:
 
 ```json
-{ "error": "Binder not found or not public" }
+{ "error": { "code": "not_found", "message": "Binder not found or not public" } }
 ```
 
 ## 3. Get a binder's value history
@@ -85,6 +86,7 @@ curl http://localhost:3000/api/v1/trades/<token>
       "game": "pokemon",
       "set_name": "Base Set",
       "quantity": 1,
+      "finish": "nonfoil",
       "price": { "usd": 300.0, "usd_foil": null, "eur": null }
     }
   ],
@@ -104,6 +106,8 @@ curl "http://localhost:3000/api/v1/cards?q=charizard&game=pokemon"
 ```json
 {
   "count": 1,
+  "has_more": false,
+  "next_cursor": null,
   "cards": [
     {
       "card_id": "base1-4",
@@ -121,7 +125,14 @@ curl "http://localhost:3000/api/v1/cards?q=charizard&game=pokemon"
 }
 ```
 
-`game` and `q` are optional; `limit` caps results (default 50, max 100).
+`game` and `q` are optional; `limit` sets the page size (default 50, max 100).
+`count` is the number of cards in **this page**, not the catalog total. When
+`has_more` is true, pass `next_cursor` back as `?cursor=…` to fetch the next
+page:
+
+```bash
+curl "http://localhost:3000/api/v1/cards?q=charizard&cursor=<next_cursor>"
+```
 
 ## 6. Get one card with its price history
 
@@ -146,12 +157,18 @@ curl http://localhost:3000/api/v1/cards/pokemon/base1-4
 A card no Binder user tracks returns `404`:
 
 ```json
-{ "error": "Card not found in catalog" }
+{ "error": { "code": "not_found", "message": "Card not found in catalog" } }
 ```
 
 ## Notes
 
-- Responses are cached for 5 minutes (`Cache-Control: public, max-age=300`).
+- Every error uses the envelope `{ "error": { "code", "message" } }`. Codes:
+  `invalid_request`, `not_found`, `rate_limited`, `internal`.
+- Requests are rate-limited per IP (60/minute). Over the limit returns `429`
+  with a `Retry-After` header.
+- Responses are cached for 5 minutes (`Cache-Control: public, max-age=300`) and
+  carry a weak `ETag`. Send it back as `If-None-Match` to get a `304 Not
+  Modified` when nothing changed.
 - CORS is open (`Access-Control-Allow-Origin: *`) so you can call the API from a
   browser app.
 - The machine-readable spec is at `/api/v1/openapi.json`.

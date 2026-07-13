@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { ATTRIBUTION, V1_HEADERS } from '@/lib/publicApi'
+import { ATTRIBUTION, V1_HEADERS, v1Error, v1Json } from '@/lib/publicApi'
 import { logError } from '@/lib/logError'
 
 interface HistoryPoint {
@@ -13,7 +13,7 @@ export async function OPTIONS() {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
@@ -26,25 +26,19 @@ export async function GET(
     .maybeSingle()
 
   if (!binder || !binder.is_public) {
-    return NextResponse.json(
-      { error: 'Binder not found or not public' },
-      { status: 404, headers: V1_HEADERS }
-    )
+    return v1Error(404, 'not_found', 'Binder not found or not public')
   }
 
   // Our own price history, built from daily snapshots — not upstream history.
   const { data, error } = await supabase.rpc('binder_value_history', { binder_id_param: id })
   if (error) {
     logError('v1:binder-history', error)
-    return NextResponse.json({ error: error.message }, { status: 500, headers: V1_HEADERS })
+    return v1Error(500, 'internal', 'Failed to load history')
   }
 
-  return NextResponse.json(
-    {
-      binder_id: id,
-      history: (data ?? []) as HistoryPoint[],
-      attribution: ATTRIBUTION,
-    },
-    { headers: V1_HEADERS }
-  )
+  return v1Json(request, {
+    binder_id: id,
+    history: (data ?? []) as HistoryPoint[],
+    attribution: ATTRIBUTION,
+  })
 }

@@ -1,3 +1,4 @@
+import { NextResponse } from 'next/server'
 import type { Card } from '@/types/card'
 import type { Finish } from '@/types/holding'
 
@@ -12,6 +13,49 @@ export const V1_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Cache-Control': 'public, max-age=300, stale-while-revalidate=3600',
+}
+
+// Every v1 error uses one envelope: { error: { code, message } }. `code` is a
+// stable machine string; `message` is human-readable and may change.
+export type V1ErrorCode = 'invalid_request' | 'not_found' | 'rate_limited' | 'internal'
+
+export function v1Error(
+  status: number,
+  code: V1ErrorCode,
+  message: string,
+  extraHeaders?: Record<string, string>
+): NextResponse {
+  return NextResponse.json(
+    { error: { code, message } },
+    { status, headers: { ...V1_HEADERS, ...(extraHeaders ?? {}) } }
+  )
+}
+
+// Weak FNV-1a hash of the serialized body — enough for ETag revalidation
+// without pulling in a crypto dependency, and runtime-agnostic.
+function weakEtag(body: unknown): string {
+  const s = JSON.stringify(body)
+  let h = 2166136261 >>> 0
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return `W/"${(h >>> 0).toString(16)}-${s.length}"`
+}
+
+// JSON response for v1 GETs with an ETag; returns 304 when the client's
+// If-None-Match already matches this exact payload.
+export function v1Json(
+  request: Request,
+  body: unknown,
+  extraHeaders?: Record<string, string>
+): NextResponse {
+  const etag = weakEtag(body)
+  const headers = { ...V1_HEADERS, ETag: etag, ...(extraHeaders ?? {}) }
+  if (request.headers.get('If-None-Match') === etag) {
+    return new NextResponse(null, { status: 304, headers })
+  }
+  return NextResponse.json(body, { headers })
 }
 
 export const GAMES = ['mtg', 'pokemon', 'onepiece'] as const
