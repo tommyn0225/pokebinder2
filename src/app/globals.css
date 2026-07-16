@@ -62,3 +62,92 @@ body {
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
+
+/* Foil overlays — a travelling glint marks the foil finish.
+   Regular foils get a quiet sheen; foil-only printings (surge/special foils —
+   upstream never labels them, but they have no nonfoil price) get the full
+   holographic treatment.
+   NOTE: keep keyframes single-property (transform / filter) — Lightning CSS
+   silently drops multi-value background-position keyframes. */
+.foil-shine {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* The travelling glint: a soft diagonal band swept across by transform,
+   which composites on the GPU and stays smooth. */
+.foil-shine::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    75deg,
+    transparent 32%,
+    rgba(255, 255, 255, 0.10) 44%,
+    rgba(190, 215, 255, 0.16) 50%,
+    rgba(255, 255, 255, 0.10) 56%,
+    transparent 68%
+  );
+  mix-blend-mode: screen;
+  animation: foil-sweep 4s ease-in-out infinite;
+}
+
+@keyframes foil-sweep {
+  0%   { transform: translateX(-100%); }
+  60%  { transform: translateX(100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Special foils: a brighter prismatic glint… */
+.foil-shine-special::before {
+  background: linear-gradient(
+    75deg,
+    transparent 26%,
+    rgba(255, 120, 210, 0.22) 40%,
+    rgba(140, 225, 255, 0.32) 50%,
+    rgba(170, 255, 190, 0.22) 60%,
+    transparent 74%
+  );
+  animation-duration: 3s;
+}
+
+/* …plus a persistent iridescent wash that slowly cycles hue. */
+.foil-shine-special::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    rgba(255, 0, 128, 0.16),
+    rgba(0, 224, 255, 0.16) 30%,
+    rgba(120, 255, 148, 0.16) 55%,
+    rgba(255, 221, 0, 0.16) 80%,
+    rgba(255, 0, 128, 0.16)
+  );
+  mix-blend-mode: color-dodge;
+  animation: foil-hue 7s linear infinite;
+}
+
+@keyframes foil-hue {
+  from { filter: hue-rotate(0deg); }
+  to   { filter: hue-rotate(360deg); }
+}
+
+/* Rings: a quiet brand hairline for regular foil, a glow for special foils */
+.foil-ring {
+  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.55);
+}
+
+.foil-ring-special {
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.7), 0 0 18px 4px rgba(0, 224, 255, 0.3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .foil-shine::before,
+  .foil-shine-special::after {
+    animation: none;
+  }
+}

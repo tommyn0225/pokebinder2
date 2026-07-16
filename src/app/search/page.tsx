@@ -356,8 +356,12 @@ function CardModal({ card, binders, onClose }: { card: Card; binders: BinderRef[
   // The printing currently on display drives image, details, price, and add.
   const active = printings?.find((p) => p.id === selectedId) ?? card
   const foilable = active.price.usd_foil != null
+  // No nonfoil price means the printing only exists in foil — upstream never
+  // labels surge/special foils, but this is their signature. Force the foil
+  // finish and give it the premium treatment.
+  const foilOnly = foilable && active.price.usd == null
   // A printing without a foil can't be shown as foil.
-  const effectiveFinish: Finish = foilable ? finish : 'nonfoil'
+  const effectiveFinish: Finish = foilOnly ? 'foil' : foilable ? finish : 'nonfoil'
 
   // Distinct sets that actually contain this card, in the printings' order
   // (chronological). Only these appear in the Set dropdown — same idea as the
@@ -403,20 +407,28 @@ function CardModal({ card, binders, onClose }: { card: Card; binders: BinderRef[
         </button>
         <div className="sm:flex">
           <div className="sm:w-1/2 shrink-0 p-4">
-            <CardImage
-              key={active.id}
-              src={active.image_url}
-              alt={active.name}
-              loading="eager"
-              width={488}
-              height={680}
-              className="w-full h-auto rounded-lg"
-              fallback={
-                <div className="aspect-[2.5/3.5] bg-background rounded-lg flex items-center justify-center text-sm text-muted">
-                  No image
-                </div>
-              }
-            />
+            <div className={`relative rounded-lg overflow-hidden transition-shadow ${
+              effectiveFinish === 'foil' ? (foilOnly ? 'foil-ring-special' : 'foil-ring') : ''
+            }`}>
+              <CardImage
+                key={active.id}
+                src={active.image_url}
+                alt={active.name}
+                loading="eager"
+                width={488}
+                height={680}
+                className="w-full h-auto rounded-lg"
+                fallback={
+                  <div className="aspect-[2.5/3.5] bg-background rounded-lg flex items-center justify-center text-sm text-muted">
+                    No image
+                  </div>
+                }
+              />
+              {/* Foil sheen — quiet for regular foils, holographic for foil-only printings */}
+              {effectiveFinish === 'foil' && (
+                <div className={`foil-shine ${foilOnly ? 'foil-shine-special' : ''}`} aria-hidden="true" />
+              )}
+            </div>
           </div>
           <div className="sm:w-1/2 p-4 sm:pl-2 flex flex-col">
             <h2 className="text-lg font-bold text-ink pr-8">{active.name}</h2>
@@ -473,8 +485,18 @@ function CardModal({ card, binders, onClose }: { card: Card; binders: BinderRef[
               </div>
             </dl>
 
+            {/* Foil-only printings have no normal version — no toggle to offer */}
+            {foilOnly && (
+              <div className="mt-4">
+                <span className="microlabel text-muted block mb-1">Finish</span>
+                <span className="microlabel inline-flex items-center gap-1.5 rounded-md border border-brand/50 bg-brand/10 px-3 py-1.5 text-brand">
+                  ✦ Foil only — special printing
+                </span>
+              </div>
+            )}
+
             {/* Finish toggle — only when the selected printing has a foil */}
-            {foilable && (
+            {foilable && !foilOnly && (
               <div className="mt-4">
                 <span className="microlabel text-muted block mb-1">Finish</span>
                 <div className="flex divide-x divide-line rounded-md border border-line overflow-hidden w-fit" role="group" aria-label="Finish">
