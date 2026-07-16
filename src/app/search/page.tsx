@@ -145,14 +145,19 @@ function PriceTag({ price }: { price: Card['price'] }) {
 interface AddToBinderProps {
   card: Card
   binders: BinderRef[]
+  // When provided, the caller owns the finish (e.g. the modal's printing
+  // picker) and the button hides its own finish selector.
+  finish?: Finish
 }
 
-function AddToBinderButton({ card, binders }: AddToBinderProps) {
+function AddToBinderButton({ card, binders, finish: finishProp }: AddToBinderProps) {
   const [open, setOpen] = useState(false)
   const [adding, setAdding] = useState<string | null>(null)
   const [done, setDone]   = useState<string | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
-  const [finish, setFinish] = useState<Finish>('nonfoil')
+  const [internalFinish, setInternalFinish] = useState<Finish>('nonfoil')
+  const finish = finishProp ?? internalFinish
+  const controlled = finishProp !== undefined
   const ref = useRef<HTMLDivElement>(null)
   const toast = useToast()
 
@@ -223,9 +228,10 @@ function AddToBinderButton({ card, binders }: AddToBinderProps) {
       </button>
       {open && (
         <div className="absolute bottom-full mb-1 left-0 right-0 bg-surface border border-line rounded-lg shadow-md z-20 overflow-hidden">
-          {/* Finish selector — only offered when the card has a foil printing;
-              each option shows its own price so switching changes what's added */}
-          {card.price.usd_foil != null && (
+          {/* Finish selector — only offered when the card has a foil printing
+              and the caller isn't already controlling finish; each option shows
+              its own price so switching changes what's added */}
+          {!controlled && card.price.usd_foil != null && (
             <div className="flex divide-x divide-line border-b border-line" role="group" aria-label="Finish">
               {(['nonfoil', 'foil'] as Finish[]).map((f) => {
                 const p = finishPrice(f, card.price)
@@ -233,7 +239,7 @@ function AddToBinderButton({ card, binders }: AddToBinderProps) {
                   <button
                     key={f}
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); setFinish(f) }}
+                    onClick={(e) => { e.stopPropagation(); setInternalFinish(f) }}
                     aria-pressed={finish === f}
                     className={`flex-1 py-1.5 px-1 text-center transition-colors ${
                       finish === f ? 'bg-brand text-brand-contrast' : 'bg-surface text-muted hover:text-ink'
@@ -314,6 +320,13 @@ function CardGrid({ cards, binders, onSelect }: { cards: Card[]; binders: Binder
 // ── Card detail modal ─────────────────────────────────────────────────────────
 
 function CardModal({ card, binders, onClose }: { card: Card; binders: BinderRef[]; onClose: () => void }) {
+  // Printing picker (MTG only): every printing of this card by name, so the
+  // user can switch set/version. Others return per-set rows already, so they
+  // skip this and the modal shows just the clicked card.
+  const [printings, setPrintings] = useState<Card[] | null>(null)
+  const [selectedId, setSelectedId] = useState<string>(card.id)
+  const [finish, setFinish] = useState<Finish>('nonfoil')
+
   useEffect(() => {
     document.body.style.overflow = 'hidden'
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
@@ -324,16 +337,61 @@ function CardModal({ card, binders, onClose }: { card: Card; binders: BinderRef[
     }
   }, [onClose])
 
-  const details: { label: string; value: string }[] = []
-  if (card.set_name)  details.push({ label: 'Set',    value: card.set_name })
-  if (card.type_line) details.push({ label: 'Type',   value: card.type_line })
-  if (card.rarity)    details.push({ label: 'Rarity', value: card.rarity })
+  useEffect(() => {
+    if (card.game !== 'mtg') return
+    let alive = true
+    fetch(`/api/cards/printings?game=mtg&name=${encodeURIComponent(card.name)}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: Card[]) => {
+        if (!alive || !Array.isArray(data) || data.length === 0) return
+        setPrintings(data)
+        // Keep the clicked printing selected if it's in the list.
+        if (data.some((p) => p.id === card.id)) setSelectedId(card.id)
+        else setSelectedId(data[0].id)
+      })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [card.game, card.name, card.id])
 
-  const price = card.price.usd ?? card.price.eur
-  const priceStr = price != null ? `${card.price.usd != null ? '$' : '€'}${price.toFixed(2)}` : '—'
+  // The printing currently on display drives image, details, price, and add.
+  const active = printings?.find((p) => p.id === selectedId) ?? card
+  const foilable = active.price.usd_foil != null
+  // A printing without a foil can't be shown as foil.
+  const effectiveFinish: Finish = foilable ? finish : 'nonfoil'
+
+  // Distinct sets that actually contain this card, in the printings' order
+  // (chronological). Only these appear in the Set dropdown — same idea as the
+  // search screen's set filter, but scoped to sets that have the card.
+  const setList: { code: string; name: string }[] = []
+  if (printings) {
+    const seen = new Set<string>()
+    for (const p of printings) {
+      if (!seen.has(p.set_code)) { seen.add(p.set_code); setList.push({ code: p.set_code, name: p.set_name }) }
+    }
+  }
+  // Printings within the selected set (a set can hold multiple variants).
+  const withinSet = printings ? printings.filter((p) => p.set_code === active.set_code) : []
+
+  // Switching set jumps to that set's first printing.
+  function selectSet(code: string) {
+    const first = printings?.find((p) => p.set_code === code)
+    if (first) setSelectedId(first.id)
+  }
+
+  const details: { label: string; value: string }[] = []
+  // The Set dropdown already names the set; only repeat it as a detail row when
+  // there's no dropdown (single-set cards, or non-MTG games).
+  if (setList.length <= 1 && active.set_name) details.push({ label: 'Set', value: active.set_name })
+  if (active.type_line) details.push({ label: 'Type',   value: active.type_line })
+  if (active.rarity)    details.push({ label: 'Rarity', value: active.rarity })
+
+  const shownPrice = finishPrice(effectiveFinish, active.price) ?? active.price.eur
+  const priceStr = shownPrice != null
+    ? `${finishPrice(effectiveFinish, active.price) != null ? '$' : '€'}${shownPrice.toFixed(2)}`
+    : '—'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={card.name}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={active.name}>
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-line bg-surface">
         <button
@@ -346,8 +404,9 @@ function CardModal({ card, binders, onClose }: { card: Card; binders: BinderRef[
         <div className="sm:flex">
           <div className="sm:w-1/2 shrink-0 p-4">
             <CardImage
-              src={card.image_url}
-              alt={card.name}
+              key={active.id}
+              src={active.image_url}
+              alt={active.name}
               loading="eager"
               width={488}
               height={680}
@@ -360,7 +419,44 @@ function CardModal({ card, binders, onClose }: { card: Card; binders: BinderRef[
             />
           </div>
           <div className="sm:w-1/2 p-4 sm:pl-2 flex flex-col">
-            <h2 className="text-lg font-bold text-ink pr-8">{card.name}</h2>
+            <h2 className="text-lg font-bold text-ink pr-8">{active.name}</h2>
+
+            {/* Set picker — the distinct sets that actually have this card */}
+            {setList.length > 1 && (
+              <div className="mt-4">
+                <label className="microlabel text-muted block mb-1" htmlFor="set-select">Set / expansion</label>
+                <select
+                  id="set-select"
+                  value={active.set_code}
+                  onChange={(e) => selectSet(e.target.value)}
+                  className="w-full text-sm text-ink bg-surface border border-line rounded-md px-2 py-1.5 focus:outline-none focus:border-brand"
+                >
+                  {setList.map((s) => (
+                    <option key={s.code} value={s.code}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Printing picker — only when the chosen set has multiple variants */}
+            {withinSet.length > 1 && (
+              <div className="mt-3">
+                <label className="microlabel text-muted block mb-1" htmlFor="printing-select">Printing</label>
+                <select
+                  id="printing-select"
+                  value={selectedId}
+                  onChange={(e) => setSelectedId(e.target.value)}
+                  className="w-full text-sm text-ink bg-surface border border-line rounded-md px-2 py-1.5 focus:outline-none focus:border-brand"
+                >
+                  {withinSet.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      #{p.collector_number}{p.price.usd != null ? ` · $${p.price.usd.toFixed(2)}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <dl className="mt-4 space-y-3">
               {details.map(d => (
                 <div key={d.label}>
@@ -372,14 +468,39 @@ function CardModal({ card, binders, onClose }: { card: Card; binders: BinderRef[
                 <dt className="microlabel text-muted">Price</dt>
                 <dd className="font-mono text-lg text-ink mt-0.5">
                   {priceStr}
-                  {card.price.usd_foil != null && (
-                    <span className="ml-2 text-sm text-brand">✦ ${card.price.usd_foil.toFixed(2)} foil</span>
-                  )}
+                  {effectiveFinish === 'foil' && <span className="ml-2 text-sm text-brand">foil</span>}
                 </dd>
               </div>
             </dl>
+
+            {/* Finish toggle — only when the selected printing has a foil */}
+            {foilable && (
+              <div className="mt-4">
+                <span className="microlabel text-muted block mb-1">Finish</span>
+                <div className="flex divide-x divide-line rounded-md border border-line overflow-hidden w-fit" role="group" aria-label="Finish">
+                  {(['nonfoil', 'foil'] as Finish[]).map((f) => {
+                    const p = finishPrice(f, active.price)
+                    return (
+                      <button
+                        key={f}
+                        type="button"
+                        onClick={() => setFinish(f)}
+                        aria-pressed={effectiveFinish === f}
+                        className={`px-3 py-1.5 text-center transition-colors ${
+                          effectiveFinish === f ? 'bg-brand text-brand-contrast' : 'bg-surface text-muted hover:text-ink'
+                        }`}
+                      >
+                        <span className="microlabel block">{f === 'foil' ? 'Foil' : 'Normal'}</span>
+                        <span className="block text-[10px] font-mono opacity-90">{p != null ? `$${p.toFixed(2)}` : '—'}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="mt-6 sm:mt-auto pt-4">
-              <AddToBinderButton card={card} binders={binders} />
+              <AddToBinderButton card={active} binders={binders} finish={effectiveFinish} />
             </div>
           </div>
         </div>

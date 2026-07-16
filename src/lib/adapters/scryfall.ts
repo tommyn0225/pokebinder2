@@ -78,4 +78,28 @@ export const scryfallAdapter: GameAdapter = {
     await setCached(key, card, TTL)
     return card
   },
+
+  async getPrintings(name: string): Promise<Card[]> {
+    const key = `scryfall:printings:${name.toLowerCase()}`
+    const cached = await getCached<Card[]>(key)
+    if (cached) return cached
+
+    // Exact-name match, every printing, oldest release first so the picker
+    // reads chronologically (original → reprints).
+    const q = `!"${name}" unique:prints`
+    const url = `${BASE_URL}/cards/search?q=${encodeURIComponent(q)}&order=released&dir=asc`
+    const res = await fetch(url, { headers: HEADERS })
+
+    if (res.status === 404) {
+      await setCached(key, [], TTL)
+      return []
+    }
+    if (!res.ok) throw new Error(`Scryfall printings failed: ${res.status}`)
+
+    const data = await res.json()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const printings: Card[] = data.data.map((c: any) => mapCard(c))
+    await setCached(key, printings, TTL)
+    return printings
+  },
 }

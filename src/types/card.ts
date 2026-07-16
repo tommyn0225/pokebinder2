@@ -35,4 +35,8 @@ export interface SearchFilters {
 export interface GameAdapter {
   search(query: string, filters?: SearchFilters): Promise<CardSearchResult>
   getById(id: string): Promise<Card | null>
+  // Optional: every printing of a card by exact name, so a user can pick a
+  // specific set/version (MTG only — Pokémon/One Piece searches already return
+  // per-set rows, so they leave this unimplemented).
+  getPrintings?(name: string): Promise<Card[]>
 }

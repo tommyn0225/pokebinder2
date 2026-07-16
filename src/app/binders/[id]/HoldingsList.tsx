@@ -169,7 +169,34 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
   const [view,      setView]    = useState<ViewMode>('list')
   // Per-result foil choice, keyed by card id; absent means nonfoil.
   const [foilSel,   setFoilSel] = useState<Record<string, boolean>>({})
+  // MTG printing picker: which result row is expanded, the printings fetched
+  // per result (keyed by the result's card id), and the chosen printing id.
+  const [versionsOpen, setVersionsOpen] = useState<string | null>(null)
+  const [printings,    setPrintings]    = useState<Record<string, Card[]>>({})
+  const [variantSel,   setVariantSel]   = useState<Record<string, string>>({})
   const toast = useToast()
+
+  const loadPrintings = useCallback(async (card: Card) => {
+    if (printings[card.id]) return
+    try {
+      const res = await fetch(`/api/cards/printings?game=mtg&name=${encodeURIComponent(card.name)}`)
+      const data: Card[] = await res.json()
+      if (res.ok && Array.isArray(data) && data.length > 0) {
+        setPrintings(prev => ({ ...prev, [card.id]: data }))
+        // Seed the selection: keep the clicked printing if it's in the list,
+        // otherwise fall back to the first so the picker and price stay in sync.
+        const seed = data.some(p => p.id === card.id) ? card.id : data[0].id
+        setVariantSel(prev => (prev[card.id] ? prev : { ...prev, [card.id]: seed }))
+      }
+    } catch {
+      /* leave the row on its default printing */
+    }
+  }, [printings])
+
+  function toggleVersions(card: Card) {
+    setVersionsOpen(open => (open === card.id ? null : card.id))
+    void loadPrintings(card)
+  }
 
   const search = useCallback(async (q: string) => {
     if (q.trim().length < 2) { setResults([]); return }
@@ -193,9 +220,11 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
     search(debouncedQuery)
   }, [debouncedQuery, search])
 
-  async function handleAdd(card: Card) {
-    const finish: Finish = card.price.usd_foil != null && foilSel[card.id] ? 'foil' : 'nonfoil'
-    setAdding(card.id)
+  // `card` is the resolved printing to add; `rowKey` is the original result id
+  // driving the row's Adding… indicator (it can differ from card.id once a
+  // different printing is picked).
+  async function handleAdd(card: Card, finish: Finish, rowKey: string) {
+    setAdding(rowKey)
     const res = await fetch(`/api/binders/${binderId}/holdings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -298,49 +327,94 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
             {results.length > 0 && (
               <ul className="rounded-md border border-line divide-y divide-line bg-surface max-h-72 overflow-y-auto">
                 {results.map(card => {
-                  // Foil is only offered when the card has a foil printing.
-                  const foilable = card.price.usd_foil != null
+                  // Resolve the printing to add: a picked version, else the
+                  // default search result. MTG only offers version switching.
+                  const rowPrintings = printings[card.id]
+                  const active = rowPrintings?.find(p => p.id === variantSel[card.id]) ?? card
+                  // Foil is only offered when the resolved printing has a foil.
+                  const foilable = active.price.usd_foil != null
                   const finish: Finish = foilable && foilSel[card.id] ? 'foil' : 'nonfoil'
                   const priceStr =
                     finish === 'foil'
-                      ? `$${card.price.usd_foil!.toFixed(2)}`
-                      : priceDisplay(card)
+                      ? `$${active.price.usd_foil!.toFixed(2)}`
+                      : priceDisplay(active)
+                  const canPickVersion = binderGame === 'mtg'
+                  const expanded = versionsOpen === card.id
                   return (
-                  <li key={card.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-background transition-colors">
-                    <CardImage src={card.image_url} alt={card.name} width={32} height={44} className="w-8 h-11 object-cover rounded" fallback={THUMB_FALLBACK} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-ink truncate">{card.name}</p>
-                      <p className="text-xs text-muted">{card.set_name} · {priceStr}</p>
-                    </div>
-                    {/* Finish selector — only shown when a foil printing exists */}
-                    {foilable && (
-                      <div
-                        role="group"
-                        aria-label={`Finish for ${card.name}`}
-                        className="flex shrink-0 divide-x divide-line rounded-md border border-line overflow-hidden"
+                  <li key={card.id} className="px-4 py-2.5 hover:bg-background transition-colors">
+                    <div className="flex items-center gap-3">
+                      <CardImage src={active.image_url} alt={active.name} width={32} height={44} className="w-8 h-11 object-cover rounded" fallback={THUMB_FALLBACK} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-ink truncate">{active.name}</p>
+                        <p className="text-xs text-muted truncate">{active.set_name} · {priceStr}</p>
+                      </div>
+                      {/* Versions toggle — MTG only, opens the printing picker */}
+                      {canPickVersion && (
+                        <button
+                          type="button"
+                          onClick={() => toggleVersions(card)}
+                          aria-expanded={expanded}
+                          className={`microlabel shrink-0 rounded-md border px-2.5 py-1.5 transition-colors ${
+                            expanded ? 'border-brand text-brand' : 'border-line text-muted hover:text-ink'
+                          }`}
+                        >
+                          Versions
+                        </button>
+                      )}
+                      {/* Finish selector — only shown when a foil printing exists */}
+                      {foilable && (
+                        <div
+                          role="group"
+                          aria-label={`Finish for ${active.name}`}
+                          className="flex shrink-0 divide-x divide-line rounded-md border border-line overflow-hidden"
+                        >
+                          {(['nonfoil', 'foil'] as Finish[]).map(f => (
+                            <button
+                              key={f}
+                              type="button"
+                              onClick={() => setFoilSel(s => ({ ...s, [card.id]: f === 'foil' }))}
+                              aria-pressed={finish === f}
+                              className={`microlabel px-2.5 py-1.5 transition-colors ${
+                                finish === f ? 'bg-brand text-brand-contrast' : 'bg-surface text-muted hover:text-ink'
+                              }`}
+                            >
+                              {f === 'foil' ? 'Foil' : 'Normal'}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <button
+                        onClick={() => handleAdd(active, finish, card.id)}
+                        disabled={adding === card.id}
+                        className="microlabel shrink-0 rounded-md border border-line px-3 py-1.5 text-ink hover:border-brand hover:text-brand disabled:opacity-50 transition-colors"
                       >
-                        {(['nonfoil', 'foil'] as Finish[]).map(f => (
-                          <button
-                            key={f}
-                            type="button"
-                            onClick={() => setFoilSel(s => ({ ...s, [card.id]: f === 'foil' }))}
-                            aria-pressed={finish === f}
-                            className={`microlabel px-2.5 py-1.5 transition-colors ${
-                              finish === f ? 'bg-brand text-brand-contrast' : 'bg-surface text-muted hover:text-ink'
-                            }`}
+                        {adding === card.id ? 'Adding…' : '+ Add'}
+                      </button>
+                    </div>
+                    {/* Printing picker */}
+                    {canPickVersion && expanded && (
+                      <div className="mt-2 pl-11">
+                        {!rowPrintings ? (
+                          <p className="text-xs text-muted">Loading printings…</p>
+                        ) : rowPrintings.length <= 1 ? (
+                          <p className="text-xs text-muted">Only one printing available.</p>
+                        ) : (
+                          <select
+                            value={variantSel[card.id] ?? card.id}
+                            onChange={e => setVariantSel(s => ({ ...s, [card.id]: e.target.value }))}
+                            aria-label={`Printing for ${card.name}`}
+                            className="w-full text-xs text-ink bg-surface border border-line rounded-md px-2 py-1.5 focus:outline-none focus:border-brand"
                           >
-                            {f === 'foil' ? 'Foil' : 'Normal'}
-                          </button>
-                        ))}
+                            {rowPrintings.map(p => (
+                              <option key={p.id} value={p.id}>
+                                {p.set_name} · #{p.collector_number}
+                                {p.price.usd != null ? ` · $${p.price.usd.toFixed(2)}` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                       </div>
                     )}
-                    <button
-                      onClick={() => handleAdd(card)}
-                      disabled={adding === card.id}
-                      className="microlabel shrink-0 rounded-md border border-line px-3 py-1.5 text-ink hover:border-brand hover:text-brand disabled:opacity-50 transition-colors"
-                    >
-                      {adding === card.id ? 'Adding…' : '+ Add'}
-                    </button>
                   </li>
                   )
                 })}
