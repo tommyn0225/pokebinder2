@@ -40,6 +40,9 @@ const EMPTY_FILTERS: Filters = {
 
 const PAGE_SIZE = 30
 const PRICE_MAX_SLIDER = 500
+// Upstream adapters page their search at 100 rows; hitting it means "at least
+// this many," so we show "100+" rather than understating the true count.
+const PAGE_CAP = 100
 
 // ── Per-game filter config ───────────────────────────────────────────────────
 
@@ -783,11 +786,17 @@ export default function SearchPage() {
   }
 
   function handleGameChange(g: Game) {
+    if (g === game) return
     setGame(g)
+    // Game-specific filters (colors, types, rarities, sets) don't carry across
+    // games, but the query does — switching tabs shouldn't force a retype.
     setFilters(EMPTY_FILTERS)
-    setResult(null)
-    setQuery('')
     setPage(1)
+    if (query.trim().length >= 2) {
+      search(query, g, EMPTY_FILTERS)
+    } else {
+      setResult(null)
+    }
   }
 
   function handleClearFilters() {
@@ -802,6 +811,10 @@ export default function SearchPage() {
 
   const totalPages   = Math.max(1, Math.ceil(allFiltered.length / PAGE_SIZE))
   const displayCards = allFiltered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  // Upstream capped this page (either it said so or it returned a full page):
+  // the true total is unknown but ≥ what we got, so append "+" to the count.
+  const capped = !!result && (result.has_more || result.total >= PAGE_CAP)
 
   const activeFilterCount =
     (filters.set ? 1 : 0) + filters.colors.length + (filters.type ? 1 : 0) +
@@ -921,9 +934,12 @@ export default function SearchPage() {
                 <p className="text-sm text-muted">
                   {loading ? 'Searching…' : (
                     <>
-                      <span className="font-semibold text-ink">{allFiltered.length.toLocaleString()}</span>
+                      <span className="font-semibold text-ink">
+                        {allFiltered.length.toLocaleString()}
+                        {capped && allFiltered.length === result!.cards.length ? '+' : ''}
+                      </span>
                       {result && result.total > allFiltered.length && (
-                        <span> of {result.total.toLocaleString()}</span>
+                        <span> of {result.total.toLocaleString()}{capped ? '+' : ''}</span>
                       )} result{allFiltered.length !== 1 ? 's' : ''}
                     </>
                   )}
@@ -950,8 +966,26 @@ export default function SearchPage() {
 
             {!loading && result && allFiltered.length === 0 && (
               <div className="text-center py-16">
-                <p className="font-medium text-ink">No cards match your filters.</p>
-                <p className="text-sm mt-1 text-muted">Try adjusting or clearing your filters.</p>
+                <p className="font-medium text-ink">
+                  {query.trim() ? `No ${GAME_LABELS[game]} cards found.` : 'No cards match your filters.'}
+                </p>
+                <p className="text-sm mt-1 text-muted">
+                  {query.trim() ? 'It may be from a different game — try another below.' : 'Try adjusting or clearing your filters.'}
+                </p>
+                {query.trim() && (
+                  <div className="mt-4 flex flex-wrap justify-center gap-2">
+                    {GAMES.filter((g) => g.value !== game).map((g) => (
+                      <button
+                        key={g.value}
+                        type="button"
+                        onClick={() => handleGameChange(g.value)}
+                        className="control-label rounded-md border border-line bg-surface px-4 py-2 text-ink hover:border-brand hover:text-brand transition-colors"
+                      >
+                        Search {g.label} instead
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
