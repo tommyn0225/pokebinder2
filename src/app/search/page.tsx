@@ -7,6 +7,7 @@ import type { SetInfo } from '@/app/api/cards/sets/route'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
 import { finishPrice } from '@/lib/holdingValue'
 import { useToast } from '@/components/Toast'
+import CardImage from '@/components/CardImage'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -276,13 +277,18 @@ function CardGrid({ cards, binders, onSelect }: { cards: Card[]; binders: Binder
             className="text-left flex flex-col flex-1 cursor-pointer hover:border-brand focus:outline-none focus-visible:ring-2 focus-visible:ring-brand rounded-t-xl"
           >
             <div className="relative">
-              {card.image_url ? (
-                <img src={card.image_url} alt={card.name} loading="lazy" width={250} height={350} className="w-full h-auto object-cover" />
-              ) : (
-                <div className="aspect-[2.5/3.5] bg-background flex items-center justify-center text-xs text-muted">
-                  No image
-                </div>
-              )}
+              <CardImage
+                src={card.image_url}
+                alt={card.name}
+                width={250}
+                height={350}
+                className="w-full h-auto object-cover"
+                fallback={
+                  <div className="aspect-[2.5/3.5] bg-background flex items-center justify-center text-xs text-muted">
+                    No image
+                  </div>
+                }
+              />
             </div>
             <div className="p-2 flex flex-col gap-1 flex-1">
               <p className="text-xs font-semibold leading-tight line-clamp-2 text-ink">{card.name}</p>
@@ -339,13 +345,19 @@ function CardModal({ card, binders, onClose }: { card: Card; binders: BinderRef[
         </button>
         <div className="sm:flex">
           <div className="sm:w-1/2 shrink-0 p-4">
-            {card.image_url ? (
-              <img src={card.image_url} alt={card.name} width={488} height={680} className="w-full h-auto rounded-lg" />
-            ) : (
-              <div className="aspect-[2.5/3.5] bg-background rounded-lg flex items-center justify-center text-sm text-muted">
-                No image
-              </div>
-            )}
+            <CardImage
+              src={card.image_url}
+              alt={card.name}
+              loading="eager"
+              width={488}
+              height={680}
+              className="w-full h-auto rounded-lg"
+              fallback={
+                <div className="aspect-[2.5/3.5] bg-background rounded-lg flex items-center justify-center text-sm text-muted">
+                  No image
+                </div>
+              }
+            />
           </div>
           <div className="sm:w-1/2 p-4 sm:pl-2 flex flex-col">
             <h2 className="text-lg font-bold text-ink pr-8">{card.name}</h2>

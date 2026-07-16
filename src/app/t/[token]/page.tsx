@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/service'
 import { finishPrice } from '@/lib/holdingValue'
 import { logError } from '@/lib/logError'
+import CardImage from '@/components/CardImage'
 import type { Holding } from '@/types/holding'
 
 // Visibility can be flipped at any time, so never cache.
@@ -92,14 +93,18 @@ export default async function PublicTradeListPage({ params }: { params: Promise<
           {list.map(h => (
             <li key={h.id} className="bg-surface rounded-xl border border-line overflow-hidden flex flex-col">
               <div className="relative">
-                {h.card_data.image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={h.card_data.image_url} alt={h.card_data.name} loading="lazy" width={250} height={350} className="w-full h-auto object-cover" />
-                ) : (
-                  <div className="aspect-[2.5/3.5] bg-background flex items-center justify-center text-xs text-muted">
-                    No image
-                  </div>
-                )}
+                <CardImage
+                  src={h.card_data.image_url}
+                  alt={h.card_data.name}
+                  width={250}
+                  height={350}
+                  className="w-full h-auto object-cover"
+                  fallback={
+                    <div className="aspect-[2.5/3.5] bg-background flex items-center justify-center text-xs text-muted">
+                      No image
+                    </div>
+                  }
+                />
                 {h.quantity > 1 && (
                   <span className="absolute top-1 right-1 microlabel rounded bg-black/70 text-white px-1.5 py-0.5">
                     ×{h.quantity}

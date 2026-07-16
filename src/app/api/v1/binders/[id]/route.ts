@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { ATTRIBUTION, V1_HEADERS, serializeHolding, v1Error, v1Json } from '@/lib/publicApi'
+import { ATTRIBUTION, V1_HEADERS, serializeHolding, v1Error, v1Json, v1Origin } from '@/lib/publicApi'
 import { holdingUnitPrice } from '@/lib/holdingValue'
 import type { Card } from '@/types/card'
 import type { Finish } from '@/types/holding'
@@ -46,7 +46,7 @@ export async function GET(
     binder: { id: binder.id, name: binder.name, game: binder.game },
     card_count,
     total_usd: Math.round(total_usd * 100) / 100,
-    holdings: list.map(h => serializeHolding(h, { includeForTrade: true })),
+    holdings: list.map(h => serializeHolding(h, { includeForTrade: true, origin: v1Origin(request) })),
     attribution: ATTRIBUTION,
   })
 }

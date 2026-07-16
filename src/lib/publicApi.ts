@@ -64,6 +64,21 @@ export function isGame(value: string): value is Card['game'] {
   return (GAMES as readonly string[]).includes(value)
 }
 
+// Origin to resolve relative image URLs against. Prefer an explicit APP_URL
+// (correct behind a proxy/CDN); otherwise fall back to the request's own origin.
+export function v1Origin(request: Request): string {
+  return (process.env.APP_URL ?? new URL(request.url).origin).replace(/\/$/, '')
+}
+
+// Our Pokémon/One Piece image proxy paths are relative (`/api/cards/image?…`);
+// external API consumers fetch from another origin, so relative URLs break for
+// them. Rewrite relative paths to absolute; leave already-absolute URLs alone.
+export function toAbsoluteUrl(url: string | null, origin: string): string | null {
+  if (!url) return null
+  if (/^https?:\/\//i.test(url)) return url
+  return `${origin}${url.startsWith('/') ? '' : '/'}${url}`
+}
+
 export interface ApiCard {
   card_id: string
   name: string
@@ -81,7 +96,7 @@ export interface ApiCard {
 
 export function serializeHolding(
   h: { quantity: number; finish?: Finish; for_trade?: boolean; card_data: Card },
-  opts: { includeForTrade?: boolean } = {}
+  opts: { includeForTrade?: boolean; origin?: string } = {}
 ): ApiCard {
   const c = h.card_data
   const card: ApiCard = {
@@ -92,7 +107,7 @@ export function serializeHolding(
     set_code: c.set_code,
     collector_number: c.collector_number,
     rarity: c.rarity,
-    image_url: c.image_url,
+    image_url: opts.origin ? toAbsoluteUrl(c.image_url, opts.origin) : c.image_url,
     quantity: h.quantity,
     finish: h.finish ?? 'nonfoil',
     price: c.price,
@@ -105,7 +120,7 @@ export function serializeHolding(
 // for_trade): the catalog spans all users, so per-holding fields must not leak.
 export type CatalogCard = Omit<ApiCard, 'quantity' | 'finish' | 'for_trade'>
 
-export function serializeCard(c: Card): CatalogCard {
+export function serializeCard(c: Card, origin?: string): CatalogCard {
   return {
     card_id: c.id,
     name: c.name,
@@ -114,7 +129,7 @@ export function serializeCard(c: Card): CatalogCard {
     set_code: c.set_code,
     collector_number: c.collector_number,
     rarity: c.rarity,
-    image_url: c.image_url,
+    image_url: origin ? toAbsoluteUrl(c.image_url, origin) : c.image_url,
     price: c.price,
   }
 }

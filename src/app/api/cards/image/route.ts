@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCached, setCached } from '@/lib/cache'
+import { logError } from '@/lib/logError'
 
 const IMAGE_TTL = 60 * 60 * 24 * 7 // 7 days
 
@@ -32,6 +33,9 @@ export async function GET(req: NextRequest) {
   })
 
   if (!upstream.ok) {
+    // Upstream has no image for this id (or is failing). Log so misses are
+    // visible; callers render the "No image" placeholder on this non-OK status.
+    logError('cards/image', new Error(`image ${id} → ${upstream.status}`))
     return new NextResponse(null, { status: upstream.status })
   }
 

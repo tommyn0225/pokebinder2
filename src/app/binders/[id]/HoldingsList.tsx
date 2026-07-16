@@ -7,8 +7,14 @@ import type { Binder } from '@/types/binder'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
 import { finishPrice, holdingUnitPrice, holdingCost, summarizeGain } from '@/lib/holdingValue'
 import { useToast } from '@/components/Toast'
+import CardImage from '@/components/CardImage'
 
 type GameKey = Binder['game']
+
+// Neutral boxes for the small row/mobile thumbnails, sized to match their <img>
+// so a missing image leaves a subtle placeholder instead of a broken icon.
+const THUMB_FALLBACK = <div className="w-8 h-11 bg-background rounded shrink-0" aria-hidden />
+const THUMB_FALLBACK_MD = <div className="w-12 h-16 bg-background rounded shrink-0" aria-hidden />
 type ViewMode = 'list' | 'grid'
 
 const PLACEHOLDERS: Record<GameKey, string> = {
@@ -301,9 +307,7 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
                       : priceDisplay(card)
                   return (
                   <li key={card.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-background transition-colors">
-                    {card.image_url && (
-                      <img src={card.image_url} alt={card.name} loading="lazy" width={32} height={44} className="w-8 h-11 object-cover rounded" />
-                    )}
+                    <CardImage src={card.image_url} alt={card.name} width={32} height={44} className="w-8 h-11 object-cover rounded" fallback={THUMB_FALLBACK} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-ink truncate">{card.name}</p>
                       <p className="text-xs text-muted">{card.set_name} · {priceStr}</p>
@@ -395,13 +399,18 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
             {holdings.map(h => (
               <li key={h.id} className="bg-surface rounded-xl border border-line overflow-hidden flex flex-col">
                 <div className="relative">
-                  {h.card_data.image_url ? (
-                    <img src={h.card_data.image_url} alt={h.card_data.name} loading="lazy" width={250} height={350} className="w-full h-auto object-cover" />
-                  ) : (
-                    <div className="aspect-[2.5/3.5] bg-background flex items-center justify-center text-xs text-muted">
-                      No image
-                    </div>
-                  )}
+                  <CardImage
+                    src={h.card_data.image_url}
+                    alt={h.card_data.name}
+                    width={250}
+                    height={350}
+                    className="w-full h-auto object-cover"
+                    fallback={
+                      <div className="aspect-[2.5/3.5] bg-background flex items-center justify-center text-xs text-muted">
+                        No image
+                      </div>
+                    }
+                  />
                   {h.for_trade && (
                     <span className="absolute top-1 left-1 microlabel rounded bg-blue-600 text-white px-1.5 py-0.5">
                       For trade
@@ -442,9 +451,7 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
           <ul className="sm:hidden divide-y divide-line">
             {holdings.map(h => (
               <li key={h.id} className="p-4 flex gap-3">
-                {h.card_data.image_url && (
-                  <img src={h.card_data.image_url} alt={h.card_data.name} loading="lazy" width={48} height={66} className="w-12 h-16 object-cover rounded shrink-0" />
-                )}
+                <CardImage src={h.card_data.image_url} alt={h.card_data.name} width={48} height={66} className="w-12 h-16 object-cover rounded shrink-0" fallback={THUMB_FALLBACK_MD} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <p className="font-medium text-ink truncate">{h.card_data.name}</p>
@@ -492,9 +499,7 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
                 <tr key={h.id} className="hover:bg-background transition-colors">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">
-                      {h.card_data.image_url && (
-                        <img src={h.card_data.image_url} alt={h.card_data.name} loading="lazy" width={32} height={44} className="w-8 h-11 object-cover rounded" />
-                      )}
+                      <CardImage src={h.card_data.image_url} alt={h.card_data.name} width={32} height={44} className="w-8 h-11 object-cover rounded" fallback={THUMB_FALLBACK} />
                       <span className="font-medium text-ink">{h.card_data.name}</span>
                       {h.finish === 'foil' && <FoilTag />}
                     </div>

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { ATTRIBUTION, V1_HEADERS, serializeHolding, v1Error, v1Json } from '@/lib/publicApi'
+import { ATTRIBUTION, V1_HEADERS, serializeHolding, v1Error, v1Json, v1Origin } from '@/lib/publicApi'
 import type { Card } from '@/types/card'
 import type { Finish } from '@/types/holding'
 
@@ -37,7 +37,7 @@ export async function GET(
 
   return v1Json(request, {
     total_cards,
-    cards: list.map(h => serializeHolding(h)),
+    cards: list.map(h => serializeHolding(h, { origin: v1Origin(request) })),
     attribution: ATTRIBUTION,
   })
 }

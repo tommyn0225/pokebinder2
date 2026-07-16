@@ -329,7 +329,7 @@
           "set_code": { "type": "string" },
           "collector_number": { "type": "string" },
           "rarity": { "type": "string", "nullable": true },
-          "image_url": { "type": "string", "nullable": true },
+          "image_url": { "type": "string", "format": "uri", "nullable": true, "description": "Absolute URL to the card image (or null). Safe to fetch from any origin." },
           "quantity": { "type": "integer", "minimum": 1 },
           "finish": {
             "type": "string",
@@ -374,7 +374,7 @@
           "set_code": { "type": "string" },
           "collector_number": { "type": "string" },
           "rarity": { "type": "string", "nullable": true },
-          "image_url": { "type": "string", "nullable": true },
+          "image_url": { "type": "string", "format": "uri", "nullable": true, "description": "Absolute URL to the card image (or null). Safe to fetch from any origin." },
           "price": { "$ref": "#/components/schemas/Price" }
         },
         "required": ["card_id", "name", "game", "set_name", "price"]

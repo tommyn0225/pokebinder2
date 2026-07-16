@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { v1Error, v1Json, serializeHolding, serializeCard } from '@/lib/publicApi'
+import { v1Error, v1Json, serializeHolding, serializeCard, toAbsoluteUrl } from '@/lib/publicApi'
 import type { Card } from '@/types/card'
 
 const sampleCard: Card = {
@@ -44,6 +44,46 @@ describe('v1Json', () => {
     const a = v1Json(new Request('http://x'), { n: 1 }).headers.get('ETag')
     const b = v1Json(new Request('http://x'), { n: 2 }).headers.get('ETag')
     expect(a).not.toBe(b)
+  })
+})
+
+describe('toAbsoluteUrl', () => {
+  const origin = 'https://binder.example'
+
+  it('rewrites a relative proxy path to absolute', () => {
+    expect(toAbsoluteUrl('/api/cards/image?id=pk_1', origin)).toBe(
+      'https://binder.example/api/cards/image?id=pk_1'
+    )
+  })
+
+  it('leaves an already-absolute URL unchanged', () => {
+    expect(toAbsoluteUrl('https://cards.scryfall.io/x.jpg', origin)).toBe(
+      'https://cards.scryfall.io/x.jpg'
+    )
+  })
+
+  it('passes null through', () => {
+    expect(toAbsoluteUrl(null, origin)).toBeNull()
+  })
+})
+
+describe('serializers make image_url absolute when given an origin', () => {
+  const origin = 'https://binder.example'
+  const relCard: Card = { ...sampleCard, image_url: '/api/cards/image?id=pk_1' }
+
+  it('serializeCard rewrites a relative image_url', () => {
+    expect(serializeCard(relCard, origin).image_url).toBe(
+      'https://binder.example/api/cards/image?id=pk_1'
+    )
+  })
+
+  it('serializeHolding rewrites a relative image_url', () => {
+    const h = serializeHolding({ quantity: 1, card_data: relCard }, { origin })
+    expect(h.image_url).toBe('https://binder.example/api/cards/image?id=pk_1')
+  })
+
+  it('leaves image_url relative when no origin is passed', () => {
+    expect(serializeCard(relCard).image_url).toBe('/api/cards/image?id=pk_1')
   })
 })
 

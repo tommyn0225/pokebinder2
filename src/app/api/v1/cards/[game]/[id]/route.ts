@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { ATTRIBUTION, V1_HEADERS, isGame, serializeCard, v1Error, v1Json } from '@/lib/publicApi'
+import { ATTRIBUTION, V1_HEADERS, isGame, serializeCard, v1Error, v1Json, v1Origin } from '@/lib/publicApi'
 import type { Card } from '@/types/card'
 
 export async function OPTIONS() {
@@ -45,7 +45,7 @@ export async function GET(
   const history = [...byDay.entries()].map(([day, price_usd]) => ({ day, price_usd }))
 
   return v1Json(request, {
-    card: serializeCard(holding.card_data as Card),
+    card: serializeCard(holding.card_data as Card, v1Origin(request)),
     history,
     attribution: ATTRIBUTION,
   })

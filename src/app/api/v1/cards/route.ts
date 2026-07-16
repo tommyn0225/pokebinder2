@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { ATTRIBUTION, V1_HEADERS, isGame, serializeCard, v1Error, v1Json } from '@/lib/publicApi'
+import { ATTRIBUTION, V1_HEADERS, isGame, serializeCard, v1Error, v1Json, v1Origin } from '@/lib/publicApi'
 import { logError } from '@/lib/logError'
 import type { Card } from '@/types/card'
 
@@ -78,7 +78,7 @@ export async function GET(request: Request) {
     count: page.length,
     has_more,
     next_cursor,
-    cards: page.map(r => serializeCard(r.card_data)),
+    cards: page.map(r => serializeCard(r.card_data, v1Origin(request))),
     attribution: ATTRIBUTION,
   })
 }
