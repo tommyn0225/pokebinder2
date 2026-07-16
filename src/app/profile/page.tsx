@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import DataErrorPanel from '@/components/DataErrorPanel'
+import { logError } from '@/lib/logError'
 import { holdingUnitPrice } from '@/lib/holdingValue'
 import type { Holding } from '@/types/holding'
 import LogoutButton from './LogoutButton'
@@ -10,7 +12,7 @@ export default async function ProfilePage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [{ data: binders }, { data: holdings }] = await Promise.all([
+  const [{ data: binders, error: bindersError }, { data: holdings, error: holdingsError }] = await Promise.all([
     supabase
       .from('binders')
       .select('id, name, created_at, is_public')
@@ -21,6 +23,15 @@ export default async function ProfilePage() {
       .select('binder_id, quantity, finish, card_data')
       .eq('user_id', user.id),
   ])
+
+  if (bindersError || holdingsError) {
+    logError('profile', bindersError ?? holdingsError)
+    return (
+      <main className="max-w-2xl mx-auto px-6 py-10">
+        <DataErrorPanel />
+      </main>
+    )
+  }
 
   const binderValueMap = new Map<string, number>()
   let totalUsd = 0

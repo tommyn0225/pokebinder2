@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/service'
 import { finishPrice } from '@/lib/holdingValue'
+import { logError } from '@/lib/logError'
 import type { Holding } from '@/types/holding'
 
 // Visibility can be flipped at any time, so never cache.
@@ -38,12 +39,16 @@ export default async function PublicTradeListPage({ params }: { params: Promise<
   // Service-role read: holdings/trade_lists are owner-only under RLS, so a
   // public view must read past RLS and gate on is_public itself.
   const supabase = createServiceClient()
-  const { data: tradeList } = await supabase
+  const { data: tradeList, error: tradeListError } = await supabase
     .from('trade_lists')
     .select('user_id, is_public')
     .eq('token', token)
     .maybeSingle()
 
+  if (tradeListError) {
+    logError('t:page', tradeListError)
+    return <Message title="Something went wrong" body="We couldn’t load this trade list right now. Please try again shortly." />
+  }
   if (!tradeList) {
     return <Message title="Trade list not found" body="This link doesn’t point to a trade list that exists." />
   }
@@ -51,12 +56,17 @@ export default async function PublicTradeListPage({ params }: { params: Promise<
     return <Message title="This trade list is private" body="Its owner hasn’t made it public, so it can’t be viewed with this link." />
   }
 
-  const { data: holdings } = await supabase
+  const { data: holdings, error: holdingsError } = await supabase
     .from('holdings')
     .select('id, quantity, finish, card_data')
     .eq('user_id', tradeList.user_id)
     .eq('for_trade', true)
     .order('created_at', { ascending: true })
+
+  if (holdingsError) {
+    logError('t:page:holdings', holdingsError)
+    return <Message title="Something went wrong" body="We couldn’t load this trade list right now. Please try again shortly." />
+  }
 
   const list = (holdings ?? []) as PublicTradeHolding[]
   const totalCards = list.reduce((n, h) => n + h.quantity, 0)

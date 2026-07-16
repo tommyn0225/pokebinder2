@@ -47,7 +47,7 @@ export async function PATCH(
 
   if (error) {
     logError('holdings:update', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   return NextResponse.json(data)
@@ -71,7 +71,7 @@ export async function DELETE(
 
   if (error) {
     logError('holdings:delete', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
   return new NextResponse(null, { status: 204 })
 }

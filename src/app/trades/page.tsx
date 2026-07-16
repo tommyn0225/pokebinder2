@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import TradeShareControl from './TradeShareControl'
+import DataErrorPanel from '@/components/DataErrorPanel'
+import { logError } from '@/lib/logError'
 import { finishPrice } from '@/lib/holdingValue'
 import type { Card } from '@/types/card'
 import type { Finish } from '@/types/holding'
@@ -31,7 +33,7 @@ export default async function TradesPage() {
   // an existing visibility choice.
   await supabase.from('trade_lists').upsert({ user_id: user.id }, { onConflict: 'user_id', ignoreDuplicates: true })
 
-  const [{ data }, { data: tradeList }] = await Promise.all([
+  const [{ data, error: holdingsError }, { data: tradeList }] = await Promise.all([
     supabase
       .from('holdings')
       .select('id, quantity, finish, binder_id, card_data, binders(name, game)')
@@ -44,6 +46,15 @@ export default async function TradesPage() {
       .eq('user_id', user.id)
       .single(),
   ])
+
+  if (holdingsError) {
+    logError('trades:page', holdingsError)
+    return (
+      <main className="max-w-6xl mx-auto px-6 py-8">
+        <DataErrorPanel />
+      </main>
+    )
+  }
 
   const list = (data ?? []) as unknown as TradeHolding[]
   const totalCards = list.reduce((n, h) => n + h.quantity, 0)

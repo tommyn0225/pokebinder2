@@ -38,7 +38,7 @@ export async function GET(
 
   if (error) {
     logError('snapshots:binder', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
 
   return NextResponse.json({ history: data as BinderHistoryPoint[] })

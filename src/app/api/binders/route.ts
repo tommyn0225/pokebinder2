@@ -18,7 +18,7 @@ export async function GET() {
 
   if (error) {
     logError('binders:list', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
   return NextResponse.json(data)
 }
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
 
   if (countError) {
     logError('binders:count', countError)
-    return NextResponse.json({ error: countError.message }, { status: 500 })
+    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
   if ((count ?? 0) >= MAX_BINDERS) {
     return NextResponse.json({ error: `You can have at most ${MAX_BINDERS} binders.` }, { status: 400 })
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
 
   if (error) {
     logError('binders:create', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
   return NextResponse.json(data, { status: 201 })
 }

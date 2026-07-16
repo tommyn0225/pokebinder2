@@ -30,7 +30,7 @@ export async function GET(
 
   if (error) {
     logError('binder:value', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
 
   const holdings = (data ?? []) as Pick<Holding, 'quantity' | 'finish' | 'acquired_price_usd' | 'card_data'>[]

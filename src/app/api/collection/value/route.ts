@@ -16,7 +16,7 @@ export async function GET() {
 
   if (bindersError) {
     logError('collection:value:binders', bindersError)
-    return NextResponse.json({ error: bindersError.message }, { status: 500 })
+    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
 
   const { data, error: holdingsError } = await supabase
@@ -26,7 +26,7 @@ export async function GET() {
 
   if (holdingsError) {
     logError('collection:value:holdings', holdingsError)
-    return NextResponse.json({ error: holdingsError.message }, { status: 500 })
+    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
 
   const holdings = (data ?? []) as Pick<Holding, 'binder_id' | 'quantity' | 'finish' | 'acquired_price_usd' | 'card_data'>[]

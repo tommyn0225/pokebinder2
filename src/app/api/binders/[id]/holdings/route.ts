@@ -33,7 +33,7 @@ export async function GET(
 
   if (error) {
     logError('holdings:list', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
   return NextResponse.json(data)
 }
@@ -129,7 +129,7 @@ export async function POST(
       .single()
     if (error) {
       logError('holdings:increment', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
     }
     return NextResponse.json(data)
   }
@@ -142,7 +142,7 @@ export async function POST(
 
   if (error) {
     logError('holdings:insert', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
   return NextResponse.json(data, { status: 201 })
 }

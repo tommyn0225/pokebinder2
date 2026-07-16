@@ -21,7 +21,7 @@ export async function PATCH(request: Request) {
 
   if (error) {
     logError('trades:share', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
   return NextResponse.json(data)
 }

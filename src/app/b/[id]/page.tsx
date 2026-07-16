@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/service'
 import { finishPrice, holdingUnitPrice } from '@/lib/holdingValue'
+import { logError } from '@/lib/logError'
 import type { Holding } from '@/types/holding'
 
 // Public state depends on the binder's live is_public flag, so never cache.
@@ -44,12 +45,16 @@ export default async function PublicBinderPage({ params }: { params: Promise<{ i
   // Service-role read: binders/holdings are owner-only under RLS, so a public
   // view must read past RLS and gate on is_public itself.
   const supabase = createServiceClient()
-  const { data: binder } = await supabase
+  const { data: binder, error: binderError } = await supabase
     .from('binders')
     .select('id, name, game, is_public')
     .eq('id', id)
     .maybeSingle()
 
+  if (binderError) {
+    logError('b:page', binderError)
+    return <Message title="Something went wrong" body="We couldn’t load this binder right now. Please try again shortly." />
+  }
   if (!binder) {
     return <Message title="Binder not found" body="This link doesn’t point to a binder that exists." />
   }
@@ -57,11 +62,16 @@ export default async function PublicBinderPage({ params }: { params: Promise<{ i
     return <Message title="This binder is private" body="Its owner hasn’t made it public, so it can’t be viewed with this link." />
   }
 
-  const { data: holdings } = await supabase
+  const { data: holdings, error: holdingsError } = await supabase
     .from('holdings')
     .select('id, quantity, finish, for_trade, card_data')
     .eq('binder_id', id)
     .order('created_at', { ascending: true })
+
+  if (holdingsError) {
+    logError('b:page:holdings', holdingsError)
+    return <Message title="Something went wrong" body="We couldn’t load this binder right now. Please try again shortly." />
+  }
 
   const list = (holdings ?? []) as PublicHolding[]
   let totalUsd = 0

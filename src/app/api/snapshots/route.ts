@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
   if (error) {
     logError('snapshots:holdings-read', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
   if (!holdings || holdings.length === 0) {
     return NextResponse.json({ inserted: 0 })
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
   const { error: insertError } = await supabase.from('price_snapshots').insert(rows)
   if (insertError) {
     logError('snapshots:insert', insertError)
-    return NextResponse.json({ error: insertError.message }, { status: 500 })
+    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
 
   return NextResponse.json({ inserted: rows.length, refreshed: refreshes.length })

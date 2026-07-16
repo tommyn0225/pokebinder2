@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import BinderList from './BinderList'
 import ValueChart from '@/components/ValueChart'
+import DataErrorPanel from '@/components/DataErrorPanel'
+import { logError } from '@/lib/logError'
 import { holdingUnitPrice, summarizeGain } from '@/lib/holdingValue'
 import type { Binder } from '@/types/binder'
 import type { Holding } from '@/types/holding'
@@ -12,7 +14,7 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [{ data: binders }, { data: holdings }] = await Promise.all([
+  const [{ data: binders, error: bindersError }, { data: holdings, error: holdingsError }] = await Promise.all([
     supabase
       .from('binders')
       .select('id, name, game, created_at, is_public')
@@ -23,6 +25,17 @@ export default async function DashboardPage() {
       .select('binder_id, quantity, finish, acquired_price_usd, card_data')
       .eq('user_id', user.id),
   ])
+
+  // A DB failure must never render as an empty collection.
+  if (bindersError || holdingsError) {
+    logError('dashboard', bindersError ?? holdingsError)
+    return (
+      <main className="max-w-3xl mx-auto px-6 py-10">
+        <h1 className="text-2xl font-bold tracking-tight text-ink mb-6">Your Collection</h1>
+        <DataErrorPanel />
+      </main>
+    )
+  }
 
   const heldCards = (holdings ?? []) as Pick<Holding, 'binder_id' | 'quantity' | 'finish' | 'acquired_price_usd' | 'card_data'>[]
   const binderValueMap = new Map<string, number>()
