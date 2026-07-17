@@ -46,6 +46,13 @@ export default function BinderHeaderActions({ binderId, binderName, initialIsPub
       >
         {saving ? 'Saving…' : isPublic ? 'Make private' : 'Make public'}
       </button>
+      <a
+        href={`/api/binders/${binderId}/export`}
+        download
+        className="microlabel rounded-md border border-line px-3 py-1 text-ink hover:border-brand hover:text-brand transition-colors"
+      >
+        Export CSV
+      </a>
       <button
         onClick={() => setShareOpen(true)}
         className="microlabel rounded-md border border-line px-3 py-1 text-ink hover:border-brand hover:text-brand transition-colors"
