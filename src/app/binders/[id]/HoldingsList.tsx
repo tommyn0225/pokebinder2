@@ -8,6 +8,10 @@ import { useDebouncedValue } from '@/lib/useDebouncedValue'
 import { finishPrice, holdingUnitPrice, holdingCost, summarizeGain } from '@/lib/holdingValue'
 import { useToast } from '@/components/Toast'
 import CardImage from '@/components/CardImage'
+import ConfirmDialog from '@/components/ConfirmDialog'
+
+// Persisted "don't warn me again" for putting a private-binder card up for trade.
+const TRADE_WARNING_DISMISSED_KEY = 'trade-private-warning-dismissed'
 
 type GameKey = Binder['game']
 
@@ -159,7 +163,7 @@ function TradeToggle({ on, name, onClick }: { on: boolean; name: string; onClick
   )
 }
 
-export default function HoldingsList({ binderId, binderGame, initial }: { binderId: string; binderGame: GameKey; initial: Holding[] }) {
+export default function HoldingsList({ binderId, binderGame, binderIsPublic, initial }: { binderId: string; binderGame: GameKey; binderIsPublic: boolean; initial: Holding[] }) {
   const [holdings, setHoldings] = useState<Holding[]>(initial)
   const [query,     setQuery]   = useState('')
   const [results,   setResults] = useState<Card[]>([])
@@ -174,6 +178,9 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
   const [versionsOpen, setVersionsOpen] = useState<string | null>(null)
   const [printings,    setPrintings]    = useState<Record<string, Card[]>>({})
   const [variantSel,   setVariantSel]   = useState<Record<string, string>>({})
+  // When a private-binder card is first put up for trade, warn before exposing
+  // it via the public trade link; holds the pending holding id until confirmed.
+  const [tradeConfirmId, setTradeConfirmId] = useState<string | null>(null)
   const toast = useToast()
 
   const loadPrintings = useCallback(async (card: Card) => {
@@ -256,15 +263,40 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
     else setHoldings(prev => prev.map(h => h.id === holdingId ? json : h))
   }
 
-  async function handleToggleTrade(holdingId: string, current: boolean) {
+  async function setForTrade(holdingId: string, value: boolean) {
     const res = await fetch(`/api/binders/${binderId}/holdings/${holdingId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ for_trade: !current }),
+      body: JSON.stringify({ for_trade: value }),
     })
     const json = await res.json()
     if (!res.ok) toast(json.error ?? 'Failed to update trade status', 'error')
     else setHoldings(prev => prev.map(h => h.id === holdingId ? json : h))
+  }
+
+  function handleToggleTrade(holdingId: string, current: boolean) {
+    // Turning a card ON in a private binder exposes it via the public trade
+    // link — warn once (unless the user has dismissed the warning for good).
+    if (!current && !binderIsPublic) {
+      const dismissed =
+        typeof window !== 'undefined' &&
+        window.localStorage.getItem(TRADE_WARNING_DISMISSED_KEY) === '1'
+      if (!dismissed) {
+        setTradeConfirmId(holdingId)
+        return
+      }
+    }
+    void setForTrade(holdingId, !current)
+  }
+
+  function confirmTrade(suppress?: boolean) {
+    const id = tradeConfirmId
+    setTradeConfirmId(null)
+    if (!id) return
+    if (suppress && typeof window !== 'undefined') {
+      window.localStorage.setItem(TRADE_WARNING_DISMISSED_KEY, '1')
+    }
+    void setForTrade(id, true)
   }
 
   async function handleRemove(holdingId: string) {
@@ -609,6 +641,17 @@ export default function HoldingsList({ binderId, binderGame, initial }: { binder
           </>
         )}
       </div>
+
+      <ConfirmDialog
+        open={tradeConfirmId !== null}
+        title="Put this card up for trade?"
+        message="This card lives in a private binder. Marking it for trade adds it to your public trade list, so anyone with your trade link can see it. The rest of the binder stays private."
+        confirmLabel="Put up for trade"
+        cancelLabel="Cancel"
+        suppressLabel="Don’t warn me again"
+        onConfirm={confirmTrade}
+        onCancel={() => setTradeConfirmId(null)}
+      />
     </div>
   )
 }

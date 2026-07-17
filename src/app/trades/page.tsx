@@ -43,7 +43,7 @@ export default async function TradesPage() {
       .order('created_at', { ascending: true }),
     supabase
       .from('trade_lists')
-      .select('token, is_public')
+      .select('token')
       .eq('user_id', user.id)
       .single(),
   ])
@@ -81,7 +81,7 @@ export default async function TradesPage() {
           </p>
         </div>
         {tradeList && (
-          <TradeShareControl token={tradeList.token} initialIsPublic={tradeList.is_public} />
+          <TradeShareControl token={tradeList.token} />
         )}
       </div>
 

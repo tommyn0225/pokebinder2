@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Binder Public API",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "description": "Read-only access to Binder's own value-added layer: public binders (holdings and valuation), a binder's price history, public trade lists, and Binder's normalized card catalog.\n\nThe catalog covers every card tracked in Binder, in our normalized cross-game model, with a per-card price history built from our own daily snapshots. It is enough to build a collection app of your own on top of. This API deliberately does not expose a live upstream card or price search passthrough. Card data and pricing come from Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece); every response includes an `attribution` field crediting them.\n\nNo authentication is required. Only resources their owner has explicitly made public are reachable; everything else returns 404.\n\n**Errors** use one envelope: `{ \"error\": { \"code\": \"...\", \"message\": \"...\" } }`, where `code` is a stable machine-readable string.\n\n**Caching**: every GET returns a weak `ETag`; send it back as `If-None-Match` to get a `304 Not Modified` when the payload is unchanged.\n\n**Pagination**: `/api/v1/cards` is cursor-paginated — follow `next_cursor` until `has_more` is false.\n\n**Rate limiting**: requests are limited per IP (60 requests/minute). Over the limit returns `429` with a `Retry-After` header and error code `rate_limited`.",
     "contact": {
       "name": "Binder"
@@ -95,7 +95,7 @@
       "get": {
         "tags": ["Trades"],
         "summary": "Get a public trade list",
-        "description": "Returns the cards a user has marked for trade, addressed by the trade list's share token. Returns 404 if the token is unknown or the trade list is not public.",
+        "description": "Returns the cards a user has marked for trade, addressed by the trade list's share token. A trade list is always public, so any valid token resolves. Returns 404 if the token is unknown.",
         "operationId": "getPublicTradeList",
         "parameters": [
           {
@@ -116,7 +116,7 @@
             }
           },
           "404": {
-            "description": "Trade list not found or not public.",
+            "description": "Trade list not found.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/Error" }

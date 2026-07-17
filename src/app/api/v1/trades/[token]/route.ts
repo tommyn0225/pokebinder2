@@ -17,12 +17,12 @@ export async function GET(
   const supabase = createServiceClient()
   const { data: tradeList } = await supabase
     .from('trade_lists')
-    .select('user_id, is_public')
+    .select('user_id')
     .eq('token', token)
     .maybeSingle()
 
-  if (!tradeList || !tradeList.is_public) {
-    return v1Error(404, 'not_found', 'Trade list not found or not public')
+  if (!tradeList) {
+    return v1Error(404, 'not_found', 'Trade list not found')
   }
 
   const { data: holdings } = await supabase

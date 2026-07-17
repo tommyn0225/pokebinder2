@@ -7,14 +7,15 @@ interface ShareDialogProps {
   title: string
   /** Relative path to share, e.g. `/b/<id>` or `/t/<token>`. */
   path: string
-  isPublic: boolean
-  /** Shown (in an amber box) when not public. */
-  privateNote: string
+  /** When false, an amber `privateNote` warns the link won't open. Defaults to public. */
+  isPublic?: boolean
+  /** Shown (in an amber box) when `isPublic` is false. */
+  privateNote?: string
   subtitle?: string
   onClose: () => void
 }
 
-export default function ShareDialog({ title, path, isPublic, privateNote, subtitle, onClose }: ShareDialogProps) {
+export default function ShareDialog({ title, path, isPublic = true, privateNote, subtitle, onClose }: ShareDialogProps) {
   const [copied, setCopied] = useState(false)
   const [url, setUrl] = useState(path)
 
@@ -72,7 +73,7 @@ export default function ShareDialog({ title, path, isPublic, privateNote, subtit
           </button>
         </div>
 
-        {!isPublic && (
+        {!isPublic && privateNote && (
           <p className="mt-3 rounded-md border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
             {privateNote}
           </p>

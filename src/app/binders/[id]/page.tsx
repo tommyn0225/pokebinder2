@@ -66,7 +66,7 @@ export default async function BinderPage({ params }: { params: Promise<{ id: str
 
       <div className="lg:flex lg:items-start lg:gap-6">
         <div className="flex-1 min-w-0">
-          <HoldingsList binderId={id} binderGame={binder.game as Binder['game']} initial={(holdings ?? []) as Holding[]} />
+          <HoldingsList binderId={id} binderGame={binder.game as Binder['game']} binderIsPublic={binder.is_public} initial={(holdings ?? []) as Holding[]} />
         </div>
         <aside className="mt-6 lg:mt-0 lg:w-72 lg:shrink-0">
           <div className="rounded-xl border border-line bg-surface px-4 py-4 lg:sticky lg:top-20">

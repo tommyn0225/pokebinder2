@@ -5,7 +5,7 @@ import { logError } from '@/lib/logError'
 import CardImage from '@/components/CardImage'
 import type { Holding } from '@/types/holding'
 
-// Visibility can be flipped at any time, so never cache.
+// The for-trade set changes as the owner marks cards, so never cache.
 export const dynamic = 'force-dynamic'
 
 function priceDisplay(h: Pick<Holding, 'finish' | 'card_data'>): string {
@@ -42,7 +42,7 @@ export default async function PublicTradeListPage({ params }: { params: Promise<
   const supabase = createServiceClient()
   const { data: tradeList, error: tradeListError } = await supabase
     .from('trade_lists')
-    .select('user_id, is_public')
+    .select('user_id')
     .eq('token', token)
     .maybeSingle()
 
@@ -52,9 +52,6 @@ export default async function PublicTradeListPage({ params }: { params: Promise<
   }
   if (!tradeList) {
     return <Message title="Trade list not found" body="This link doesn’t point to a trade list that exists." />
-  }
-  if (!tradeList.is_public) {
-    return <Message title="This trade list is private" body="Its owner hasn’t made it public, so it can’t be viewed with this link." />
   }
 
   const { data: holdings, error: holdingsError } = await supabase

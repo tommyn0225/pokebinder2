@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 interface ConfirmDialogProps {
   open: boolean
@@ -9,7 +9,9 @@ interface ConfirmDialogProps {
   confirmLabel?: string
   cancelLabel?: string
   destructive?: boolean
-  onConfirm: () => void
+  /** When set, renders a checkbox; its state is passed to `onConfirm`. */
+  suppressLabel?: string
+  onConfirm: (suppress?: boolean) => void
   onCancel: () => void
 }
 
@@ -20,11 +22,14 @@ export default function ConfirmDialog({
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   destructive = false,
+  suppressLabel,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const [suppress, setSuppress] = useState(false)
   useEffect(() => {
     if (!open) return
+    setSuppress(false)
     document.body.style.overflow = 'hidden'
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onCancel() }
     document.addEventListener('keydown', onKey)
@@ -42,6 +47,17 @@ export default function ConfirmDialog({
       <div className="relative w-full max-w-sm rounded-xl border border-line bg-surface p-6">
         <h2 className="text-base font-bold text-ink">{title}</h2>
         <p className="mt-2 text-sm text-muted">{message}</p>
+        {suppressLabel && (
+          <label className="mt-4 flex items-center gap-2 text-sm text-muted cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={suppress}
+              onChange={e => setSuppress(e.target.checked)}
+              className="h-4 w-4 rounded border-line accent-brand"
+            />
+            {suppressLabel}
+          </label>
+        )}
         <div className="mt-6 flex justify-end gap-2">
           <button
             onClick={onCancel}
@@ -50,7 +66,7 @@ export default function ConfirmDialog({
             {cancelLabel}
           </button>
           <button
-            onClick={onConfirm}
+            onClick={() => onConfirm(suppress)}
             autoFocus
             className={`control-label rounded-md px-4 py-2 text-white transition-colors ${
               destructive ? 'bg-red-600 hover:bg-red-700' : 'bg-brand hover:bg-brand-hover'
