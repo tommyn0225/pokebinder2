@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { holdingsToCsv } from '@/lib/holdingsExport'
+import { holdingsToDeckList } from '@/lib/mtgDeckList'
 import { logError } from '@/lib/logError'
 import type { Holding } from '@/types/holding'
 
-// Turn a binder name into a safe CSV filename ("My Deck!" -> "my-deck").
-function csvFilename(name: string): string {
+// Turn a binder name into a safe filename ("My Deck!" -> "my-deck").
+function safeFilename(name: string): string {
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-  return `${slug || 'binder'}.csv`
+  return `${slug || 'binder'}.txt`
 }
 
 export async function GET(
@@ -22,12 +22,20 @@ export async function GET(
 
   const { data: binder } = await supabase
     .from('binders')
-    .select('id, name')
+    .select('id, name, game')
     .eq('id', id)
     .eq('user_id', user.id)
     .single()
 
   if (!binder) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  // Deck-list export is an MTG-community convention; only MTG binders offer it.
+  if (binder.game !== 'mtg') {
+    return NextResponse.json(
+      { error: 'Deck-list export is only available for Magic binders.' },
+      { status: 400 }
+    )
+  }
 
   const { data: holdings, error } = await supabase
     .from('holdings')
@@ -40,11 +48,11 @@ export async function GET(
     return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
 
-  const csv = holdingsToCsv((holdings ?? []) as Holding[])
-  return new NextResponse(csv, {
+  const text = holdingsToDeckList((holdings ?? []) as Holding[])
+  return new NextResponse(text, {
     headers: {
-      'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="${csvFilename(binder.name)}"`,
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${safeFilename(binder.name)}"`,
     },
   })
 }

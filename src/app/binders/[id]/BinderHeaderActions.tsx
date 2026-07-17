@@ -2,17 +2,26 @@
 
 import { useState } from 'react'
 import ShareDialog from '@/components/ShareDialog'
+import ImportDialog from './ImportDialog'
+import type { Binder } from '@/types/binder'
 
 interface BinderHeaderActionsProps {
   binderId: string
   binderName: string
+  binderGame: Binder['game']
   initialIsPublic: boolean
 }
 
-export default function BinderHeaderActions({ binderId, binderName, initialIsPublic }: BinderHeaderActionsProps) {
+export default function BinderHeaderActions({ binderId, binderName, binderGame, initialIsPublic }: BinderHeaderActionsProps) {
   const [isPublic, setIsPublic] = useState(initialIsPublic)
   const [saving, setSaving] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
+  const [exportWarnOpen, setExportWarnOpen] = useState(false)
+
+  // Deck-list import/export is an MTG-community convention; only MTG binders
+  // get the affordance at all.
+  const isMtg = binderGame === 'mtg'
 
   async function handleToggle() {
     setSaving(true)
@@ -26,6 +35,12 @@ export default function BinderHeaderActions({ binderId, binderName, initialIsPub
       setIsPublic(json.is_public)
     }
     setSaving(false)
+  }
+
+  function handleExport() {
+    // Trigger the download, then close the warning.
+    window.location.href = `/api/binders/${binderId}/export`
+    setExportWarnOpen(false)
   }
 
   return (
@@ -46,13 +61,22 @@ export default function BinderHeaderActions({ binderId, binderName, initialIsPub
       >
         {saving ? 'Saving…' : isPublic ? 'Make private' : 'Make public'}
       </button>
-      <a
-        href={`/api/binders/${binderId}/export`}
-        download
-        className="microlabel rounded-md border border-line px-3 py-1 text-ink hover:border-brand hover:text-brand transition-colors"
-      >
-        Export CSV
-      </a>
+      {isMtg && (
+        <>
+          <button
+            onClick={() => setImportOpen(true)}
+            className="microlabel rounded-md border border-line px-3 py-1 text-ink hover:border-brand hover:text-brand transition-colors"
+          >
+            Import
+          </button>
+          <button
+            onClick={() => setExportWarnOpen(true)}
+            className="microlabel rounded-md border border-line px-3 py-1 text-ink hover:border-brand hover:text-brand transition-colors"
+          >
+            Export
+          </button>
+        </>
+      )}
       <button
         onClick={() => setShareOpen(true)}
         className="microlabel rounded-md border border-line px-3 py-1 text-ink hover:border-brand hover:text-brand transition-colors"
@@ -68,6 +92,36 @@ export default function BinderHeaderActions({ binderId, binderName, initialIsPub
           privateNote="This binder is private. The link won’t open for anyone until you make the binder public."
           onClose={() => setShareOpen(false)}
         />
+      )}
+
+      {importOpen && <ImportDialog binderId={binderId} onClose={() => setImportOpen(false)} />}
+
+      {exportWarnOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Export deck list">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setExportWarnOpen(false)} />
+          <div className="relative w-full max-w-md rounded-xl border border-line bg-surface p-5">
+            <h2 className="font-semibold text-ink">Export deck list</h2>
+            <p className="mt-2 text-sm text-muted">
+              Exports as a Magic deck-list text file (Moxfield / Archidekt style): one line per card,
+              <code className="mx-1 text-ink">{'<qty> <name> (set) *F*'}</code>.
+              Prices, cost basis, and trade status aren’t included.
+            </p>
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setExportWarnOpen(false)}
+                className="microlabel rounded-md border border-line px-3 py-1.5 text-muted hover:text-ink transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExport}
+                className="microlabel rounded-md border border-brand bg-brand px-3 py-1.5 text-white transition-opacity hover:opacity-90"
+              >
+                Download .txt
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

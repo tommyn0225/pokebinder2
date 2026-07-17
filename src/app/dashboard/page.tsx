@@ -63,15 +63,6 @@ export default async function DashboardPage() {
           <p className="text-sm text-muted mt-0.5 truncate">{user.email}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {totalCards > 0 && (
-            <a
-              href="/api/collection/export"
-              download
-              className="control-label rounded-md border border-line px-4 py-2 text-ink hover:border-brand hover:text-brand transition-colors"
-            >
-              Export CSV
-            </a>
-          )}
           <Link
             href="/trades"
             className="control-label rounded-md border border-line px-4 py-2 text-ink hover:border-brand hover:text-brand transition-colors"

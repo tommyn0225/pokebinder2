@@ -39,7 +39,12 @@ function buildScryfallQuery(query: string, filters?: SearchFilters): string {
   return parts.join(' ') || 'a'
 }
 
-export const scryfallAdapter: GameAdapter = {
+// `resolveByName` is MTG-specific (deck-list import resolves cards by exact
+// name + optional set), so it lives on the concrete adapter type rather than
+// the shared GameAdapter interface. Still assignable to Record<_, GameAdapter>.
+export const scryfallAdapter: GameAdapter & {
+  resolveByName(name: string, setCode?: string): Promise<Card | null>
+} = {
   async search(query: string, filters?: SearchFilters): Promise<CardSearchResult> {
     const builtQuery = buildScryfallQuery(query, filters)
     const key = `scryfall:search:${builtQuery}`
@@ -75,6 +80,29 @@ export const scryfallAdapter: GameAdapter = {
     const res = await fetch(`${BASE_URL}/cards/${id}`, { headers: HEADERS })
     if (!res.ok) return null
     const card = mapCard(await res.json())
+    await setCached(key, card, TTL)
+    return card
+  },
+
+  async resolveByName(name: string, setCode?: string): Promise<Card | null> {
+    const set = setCode?.trim().toLowerCase() || ''
+    const key = `scryfall:named:${name.toLowerCase()}:${set}`
+    const cached = await getCached<Card | null>(key)
+    if (cached !== null) return cached
+
+    // Exact-name lookup, optionally scoped to a printing. If the requested set
+    // has no such card (404), fall back to the exact name in any set so a bad
+    // set code degrades to "matched, wrong printing" rather than "unmatched".
+    const named = async (withSet: boolean): Promise<Card | null> => {
+      const params = new URLSearchParams({ exact: name })
+      if (withSet && set) params.set('set', set)
+      const res = await fetch(`${BASE_URL}/cards/named?${params}`, { headers: HEADERS })
+      if (!res.ok) return null
+      return mapCard(await res.json())
+    }
+
+    let card = await named(Boolean(set))
+    if (!card && set) card = await named(false)
     await setCached(key, card, TTL)
     return card
   },

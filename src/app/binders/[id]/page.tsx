@@ -60,7 +60,7 @@ export default async function BinderPage({ params }: { params: Promise<{ id: str
         <span className="text-muted">/</span>
         <span className="font-semibold text-ink">{binder.name}</span>
         <div className="ml-auto">
-          <BinderHeaderActions binderId={binder.id} binderName={binder.name} initialIsPublic={binder.is_public} />
+          <BinderHeaderActions binderId={binder.id} binderName={binder.name} binderGame={binder.game as Binder['game']} initialIsPublic={binder.is_public} />
         </div>
       </div>
 
