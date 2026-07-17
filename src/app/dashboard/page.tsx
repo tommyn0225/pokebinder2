@@ -92,7 +92,7 @@ export default async function DashboardPage() {
         </div>
         <div className="px-5 py-4">
           <p className="microlabel text-muted">Binders</p>
-          <p className="mt-1 font-mono text-2xl text-ink">{String(bindersWithValue.length).padStart(2, '0')}</p>
+          <p className="mt-1 font-mono text-2xl text-ink">{bindersWithValue.length}</p>
         </div>
       </div>
 

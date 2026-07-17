@@ -133,7 +133,7 @@ export default function ValueChart({ endpoint, height = 180 }: Props) {
 
       {chartData.length === 0 ? (
         <p className="text-sm text-muted py-6 text-center">
-          No snapshots in this range yet.
+          Prices are snapshotted daily — your first data point lands tomorrow.
         </p>
       ) : (
         <ResponsiveContainer width="100%" height={height}>

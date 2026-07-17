@@ -49,9 +49,12 @@ export default function TradeShareControl({ token, initialIsPublic }: TradeShare
       >
         {saving ? 'Saving…' : isPublic ? 'Make private' : 'Make public'}
       </button>
+      {/* Sharing a private list copies a dead link — gate it on public */}
       <button
         onClick={() => setShareOpen(true)}
-        className="microlabel rounded-md border border-line px-3 py-1 text-ink hover:border-brand hover:text-brand transition-colors"
+        disabled={!isPublic}
+        title={isPublic ? undefined : 'Make the list public first'}
+        className="microlabel rounded-md border border-line px-3 py-1 text-ink hover:border-brand hover:text-brand disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-line disabled:hover:text-ink transition-colors"
       >
         Share
       </button>

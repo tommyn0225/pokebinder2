@@ -215,7 +215,13 @@ export default function BinderList({ initial }: { initial: BinderWithValue[] }) 
           </div>
         ) : (
           <form onSubmit={handleCreate} className="rounded-xl border border-line bg-surface p-5">
-            <h2 className="microlabel text-muted mb-3">New binder</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="microlabel text-muted">New binder</h2>
+              {/* Surface the cap before creation fails, not after */}
+              <span className="microlabel text-muted">
+                {binders.length} of {MAX_BINDERS} binders used
+              </span>
+            </div>
 
             {/* Game selector — a binder holds one game */}
             <div className="mb-3 flex w-fit divide-x divide-line rounded-md border border-line overflow-hidden">

@@ -16,6 +16,20 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Price snapshots in local dev
+
+Value charts and price history are fed by a daily snapshot job that runs on a
+schedule in production — it never reaches your machine, so charts stay empty
+in local dev until you trigger one manually:
+
+```bash
+npm run snapshot
+```
+
+Requires the dev server running and `SNAPSHOT_SECRET` set in `.env.local`
+(the script POSTs to `http://localhost:3000/api/snapshots` with it; set
+`SNAPSHOT_URL` to target another base URL).
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
