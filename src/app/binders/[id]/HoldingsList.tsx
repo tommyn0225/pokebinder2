@@ -502,9 +502,15 @@ export default function HoldingsList({ binderId, binderGame, binderIsPublic, ini
         ) : view === 'grid' ? (
           /* Grid view */
           <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 p-5">
-            {holdings.map(h => (
+            {holdings.map(h => {
+              // Foil holdings get a static sheen (Phase 31). Foil-only printings
+              // (a foil price but no nonfoil price — surge/special foils) get the
+              // brighter prismatic variant, same signal search uses for foilOnly.
+              const isFoil = h.finish === 'foil'
+              const isSpecialFoil = isFoil && h.card_data.price.usd == null && h.card_data.price.usd_foil != null
+              return (
               <li key={h.id} className="bg-surface rounded-xl border border-line overflow-hidden flex flex-col">
-                <div className="relative">
+                <div className={`relative ${isFoil ? (isSpecialFoil ? 'foil-ring-special-static' : 'foil-ring-static') : ''}`}>
                   <CardImage
                     src={h.card_data.image_url}
                     alt={h.card_data.name}
@@ -517,6 +523,9 @@ export default function HoldingsList({ binderId, binderGame, binderIsPublic, ini
                       </div>
                     }
                   />
+                  {isFoil && (
+                    <div className={`foil-shine foil-shine-static ${isSpecialFoil ? 'foil-shine-special' : ''}`} aria-hidden="true" />
+                  )}
                   {h.for_trade && (
                     <span className="absolute top-1 left-1 microlabel rounded bg-blue-600 text-white px-1.5 py-0.5">
                       For trade
@@ -548,7 +557,8 @@ export default function HoldingsList({ binderId, binderGame, binderIsPublic, ini
                   </div>
                 </div>
               </li>
-            ))}
+              )
+            })}
           </ul>
         ) : (
           /* List view (default) */
