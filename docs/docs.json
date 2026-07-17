@@ -12,7 +12,55 @@
     "light": "#8b5cf6",
     "dark": "#7c3aed"
   },
+  "api": {
+    "playground": {
+      "display": "interactive",
+      "proxy": false
+    },
+    "examples": {
+      "languages": ["bash", "python", "javascript"],
+      "prefill": true
+    }
+  },
+  "contextual": {
+    "options": ["copy", "view", "chatgpt", "claude", "mcp"]
+  },
+  "seo": {
+    "indexing": "navigable",
+    "metatags": {
+      "description": "Read-only public API for Binder: public binders, valuation, price history, trade lists, and a normalized cross-game card catalog (MTG, Pokémon, One Piece).",
+      "keywords": "trading card api, tcg api, mtg api, pokemon tcg api, one piece tcg api, card price history, collection api",
+      "og:title": "Binder API",
+      "og:description": "Read-only access to Binder's value-added collection layer — public binders, valuation, our own daily price history, and a normalized cross-game card catalog.",
+      "og:type": "website",
+      "twitter:card": "summary_large_image"
+    }
+  },
   "navigation": {
+    "global": {
+      "anchors": [
+        {
+          "anchor": "GitHub",
+          "href": "https://github.com/tommyn0225/pokebinder2",
+          "icon": "github"
+        },
+        {
+          "anchor": "Scryfall (MTG)",
+          "href": "https://scryfall.com/docs/api",
+          "icon": "book"
+        },
+        {
+          "anchor": "PokéWallet (Pokémon)",
+          "href": "https://www.pokewallet.io/api-docs",
+          "icon": "book"
+        },
+        {
+          "anchor": "OPTCG API (One Piece)",
+          "href": "https://optcgapi.com/documentation",
+          "icon": "book"
+        }
+      ]
+    },
     "tabs": [
       {
         "tab": "Documentation",
@@ -30,6 +78,8 @@
     ]
   },
   "footer": {
-    "socials": {}
+    "socials": {
+      "github": "https://github.com/tommyn0225/pokebinder2"
+    }
   }
 }

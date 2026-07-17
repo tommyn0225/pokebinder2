@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Binder Public API",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "description": "Read-only access to Binder's own value-added layer: public binders (holdings and valuation), a binder's price history, public trade lists, and Binder's normalized card catalog.\n\nThe catalog covers every card tracked in Binder, in our normalized cross-game model, with a per-card price history built from our own daily snapshots. It is enough to build a collection app of your own on top of. This API deliberately does not expose a live upstream card or price search passthrough. Card data and pricing come from Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece); every response includes an `attribution` field crediting them.\n\nNo authentication is required. Only resources their owner has explicitly made public are reachable; everything else returns 404.\n\n**Errors** use one envelope: `{ \"error\": { \"code\": \"...\", \"message\": \"...\" } }`, where `code` is a stable machine-readable string.\n\n**Caching**: every GET returns a weak `ETag`; send it back as `If-None-Match` to get a `304 Not Modified` when the payload is unchanged.\n\n**Pagination**: `/api/v1/cards` is cursor-paginated — follow `next_cursor` until `has_more` is false.\n\n**Rate limiting**: requests are limited per IP (60 requests/minute). Over the limit returns `429` with a `Retry-After` header and error code `rate_limited`.",
     "contact": {
       "name": "Binder"
@@ -18,6 +18,7 @@
     { "name": "Binders", "description": "Public binders and their price history" },
     { "name": "Trades", "description": "Public trade lists" },
     { "name": "Cards", "description": "Binder's normalized card catalog and per-card price history" },
+    { "name": "Playground", "description": "A capped, try-it-here demo of the catalog search" },
     { "name": "Meta", "description": "API metadata" }
   ],
   "paths": {
@@ -285,6 +286,62 @@
         }
       }
     },
+    "/api/demo/cards": {
+      "get": {
+        "tags": ["Playground"],
+        "summary": "Try it: search the catalog (capped demo)",
+        "description": "A capped, no-setup way to try the catalog search from these docs. Returns the same normalized cards as `GET /api/v1/cards`, but is limited to **3 pulls per IP per day** so a public docs page can't become an uncapped API. Fill in `q` (and optionally `game`), watch the code sample update with your parameters, then Send to pull real card info. For real usage, call `/api/v1/cards` directly — it is cursor-paginated, allows 60 requests/minute, and has no daily cap.",
+        "operationId": "demoSearchCards",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "Case-insensitive substring match on the card name (e.g. \"charizard\"). Omit to return the whole catalog.",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "game",
+            "in": "query",
+            "required": false,
+            "description": "Restrict results to one game.",
+            "schema": { "$ref": "#/components/schemas/Game" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching catalog cards, plus how many demo pulls remain today.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DemoCardsResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown game.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          },
+          "429": {
+            "description": "Demo limit reached (3 pulls per IP per day).",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying.",
+                "schema": { "type": "integer" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/openapi.json": {
       "get": {
         "tags": ["Meta"],
@@ -396,6 +453,27 @@
           "attribution": { "type": "string" }
         },
         "required": ["count", "has_more", "next_cursor", "cards", "attribution"]
+      },
+      "DemoCardsResponse": {
+        "type": "object",
+        "properties": {
+          "count": { "type": "integer", "description": "Number of cards returned." },
+          "demo": {
+            "type": "object",
+            "description": "Demo cap status for the calling IP.",
+            "properties": {
+              "limit": { "type": "integer", "description": "Total pulls allowed per day.", "example": 3 },
+              "remaining": { "type": "integer", "description": "Pulls left today for this IP." }
+            },
+            "required": ["limit", "remaining"]
+          },
+          "cards": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CatalogCard" }
+          },
+          "attribution": { "type": "string" }
+        },
+        "required": ["count", "demo", "cards", "attribution"]
       },
       "PricePoint": {
         "type": "object",
