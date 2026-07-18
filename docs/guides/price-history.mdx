@@ -1,0 +1,86 @@
+---
+title: Track a card's price over time
+description: Fetch a card's daily USD price history from Binder's own snapshots and shape it into points ready to chart.
+---
+
+Binder snapshots the price of every tracked card once a day and builds its own
+history — independent of any upstream's paid history. This guide pulls a card's
+history over a window and shapes it for a chart. The endpoint is
+`GET /api/v1/cards/{game}/{id}/history` on `http://localhost:3000`, no auth.
+
+## Fetch a window of history
+
+Pass `days` (1–365, default 30) to bound the window. The response has one point
+per day, oldest first:
+
+```bash
+curl "http://localhost:3000/api/v1/cards/pokemon/base1-4/history?days=30"
+```
+
+```json
+{
+  "game": "pokemon",
+  "card_id": "base1-4",
+  "days": 30,
+  "history": [
+    { "day": "2026-07-16", "price_usd": 295.0 },
+    { "day": "2026-07-17", "price_usd": 300.0 }
+  ],
+  "attribution": "…"
+}
+```
+
+Each `day` is a calendar date (`YYYY-MM-DD`) and `price_usd` is that day's USD
+snapshot. There is exactly one point per day, even when several users hold the
+same card.
+
+## Shape it for a chart
+
+Most chart libraries want an array of `{ x, y }` points. Map the history
+straight across:
+
+```js
+async function priceSeries(game, cardId, days = 30) {
+  const url = `http://localhost:3000/api/v1/cards/${game}/${cardId}/history?days=${days}`;
+  const res = await fetch(url);
+
+  if (res.status === 404) {
+    // No Binder user tracks this card yet, so there's no history to show.
+    return [];
+  }
+  if (!res.ok) {
+    const { error } = await res.json();
+    throw new Error(`${error.code}: ${error.message}`);
+  }
+
+  const { history } = await res.json();
+  return history.map((p) => ({ day: p.day, price_usd: p.price_usd }));
+}
+
+const series = await priceSeries("pokemon", "base1-4", 30);
+// → [{ day: "2026-07-16", price_usd: 295.0 }, { day: "2026-07-17", price_usd: 300.0 }]
+```
+
+Feed `series` to any charting library — the `day`/`price_usd` pairs are already
+sorted oldest to newest.
+
+## When there's no history
+
+History only exists for cards someone tracks. A card that isn't in the
+[catalog](/concepts/catalog) returns `404`:
+
+```json
+{ "error": { "code": "not_found", "message": "Card not found in catalog" } }
+```
+
+A tracked card that was only just added returns a short `history` array — Binder
+snapshots daily, so the first point lands the day after tracking begins, and the
+series lengthens by one point per day from there. See
+[Prices, finishes, and snapshots](/concepts/prices) for how the snapshots are
+built.
+
+<Note>
+  Need the full, all-time history in one call instead of a bounded window? `GET
+  /api/v1/cards/{game}/{id}` returns the card plus its complete `history` in the
+  same `{ day, price_usd }` shape.
+</Note>

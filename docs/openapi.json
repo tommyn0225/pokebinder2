@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Binder Public API",
-    "version": "1.4.0",
-    "description": "Read-only access to Binder's own value-added layer: public binders (holdings and valuation), a binder's price history, public trade lists, and Binder's normalized card catalog.\n\nThe catalog covers every card tracked in Binder, in our normalized cross-game model, with a per-card price history built from our own daily snapshots. It is enough to build a collection app of your own on top of. This API deliberately does not expose a live upstream card or price search passthrough. Card data and pricing come from Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece); every response includes an `attribution` field crediting them.\n\nNo authentication is required. Only resources their owner has explicitly made public are reachable; everything else returns 404.\n\n**Errors** use one envelope: `{ \"error\": { \"code\": \"...\", \"message\": \"...\" } }`, where `code` is a stable machine-readable string.\n\n**Caching**: every GET returns a weak `ETag`; send it back as `If-None-Match` to get a `304 Not Modified` when the payload is unchanged.\n\n**Pagination**: `/api/v1/cards` is cursor-paginated — follow `next_cursor` until `has_more` is false.\n\n**Rate limiting**: requests are limited per IP (60 requests/minute). Over the limit returns `429` with a `Retry-After` header and error code `rate_limited`.",
+    "version": "1.5.0",
+    "description": "Read-only access to Binder's own value-added layer: public binders (holdings and valuation), a binder's price history, public trade lists, and Binder's normalized card catalog.\n\nThe catalog covers every card tracked in Binder, in our normalized cross-game model, with a per-card price history built from our own daily snapshots. It is enough to build a collection app of your own on top of. This API deliberately does not expose a live upstream card or price search passthrough. Card data and pricing come from Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece); every response includes an `attribution` field crediting them.\n\nNo authentication is required. Only resources their owner has explicitly made public are reachable: a public binder, or a trade list (trade lists are always public by design). Everything else — private or nonexistent — returns 404.\n\n**Errors** use one envelope: `{ \"error\": { \"code\": \"...\", \"message\": \"...\" } }`, where `code` is a stable machine-readable string.\n\n**Caching**: every GET returns a weak `ETag`; send it back as `If-None-Match` to get a `304 Not Modified` when the payload is unchanged. Responses also carry `Cache-Control: public, max-age=300, stale-while-revalidate=3600`.\n\n**Pagination**: `/api/v1/cards` is cursor-paginated — follow `next_cursor` until `has_more` is false.\n\n**Rate limiting**: every `/api/v1` request is limited per IP (60 requests/minute). Over the limit returns `429` with a `Retry-After` header and error code `rate_limited`.\n\n**Versioning**: see the Changelog in the documentation for what changed in each release.",
     "contact": {
       "name": "Binder"
     }
@@ -33,8 +33,9 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "description": "Binder UUID.",
-            "schema": { "type": "string", "format": "uuid" }
+            "description": "Binder UUID, taken from the binder's share link (`/b/<id>`).",
+            "schema": { "type": "string", "format": "uuid" },
+            "example": "3c90c3cc-0d44-4b50-8888-8dd25736052a"
           }
         ],
         "responses": {
@@ -42,7 +43,29 @@
             "description": "The public binder.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/BinderResponse" }
+                "schema": { "$ref": "#/components/schemas/BinderResponse" },
+                "example": {
+                  "binder": { "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a", "name": "Modern staples", "game": "mtg" },
+                  "card_count": 2,
+                  "total_usd": 5.0,
+                  "holdings": [
+                    {
+                      "card_id": "e3285e6b-3e79-4d7c-bf96-d920f973b122",
+                      "name": "Lightning Bolt",
+                      "game": "mtg",
+                      "set_name": "Magic 2010",
+                      "set_code": "m10",
+                      "collector_number": "146",
+                      "rarity": "common",
+                      "image_url": "https://cards.scryfall.io/normal/front/e/3/e3285e6b-3e79-4d7c-bf96-d920f973b122.jpg",
+                      "quantity": 2,
+                      "finish": "nonfoil",
+                      "for_trade": true,
+                      "price": { "usd": 2.5, "usd_foil": 8.0, "eur": 2.1 }
+                    }
+                  ],
+                  "attribution": "Card data and pricing courtesy of Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece). Binder is an independent, non-commercial tool and exposes only its own value-added layer (binders, holdings, valuation, price history)."
+                }
               }
             }
           },
@@ -50,10 +73,12 @@
             "description": "Binder not found or not public.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": { "code": "not_found", "message": "Binder not found or not public" } }
               }
             }
-          }
+          },
+          "429": { "$ref": "#/components/responses/RateLimited" }
         }
       }
     },
@@ -68,8 +93,9 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "description": "Binder UUID.",
-            "schema": { "type": "string", "format": "uuid" }
+            "description": "Binder UUID, taken from the binder's share link (`/b/<id>`).",
+            "schema": { "type": "string", "format": "uuid" },
+            "example": "3c90c3cc-0d44-4b50-8888-8dd25736052a"
           }
         ],
         "responses": {
@@ -77,7 +103,15 @@
             "description": "Daily value history.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/HistoryResponse" }
+                "schema": { "$ref": "#/components/schemas/HistoryResponse" },
+                "example": {
+                  "binder_id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+                  "history": [
+                    { "day": "2026-07-16T00:00:00+00:00", "total_usd": 4.98 },
+                    { "day": "2026-07-17T00:00:00+00:00", "total_usd": 5.0 }
+                  ],
+                  "attribution": "Card data and pricing courtesy of Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece). Binder is an independent, non-commercial tool and exposes only its own value-added layer (binders, holdings, valuation, price history)."
+                }
               }
             }
           },
@@ -85,10 +119,12 @@
             "description": "Binder not found or not public.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": { "code": "not_found", "message": "Binder not found or not public" } }
               }
             }
-          }
+          },
+          "429": { "$ref": "#/components/responses/RateLimited" }
         }
       }
     },
@@ -96,15 +132,16 @@
       "get": {
         "tags": ["Trades"],
         "summary": "Get a public trade list",
-        "description": "Returns the cards a user has marked for trade, addressed by the trade list's share token. A trade list is always public, so any valid token resolves. Returns 404 if the token is unknown.",
+        "description": "Returns the cards a user has marked for trade, addressed by the trade list's share token. Trade lists are always public, so any valid token resolves. Returns 404 if the token is unknown.",
         "operationId": "getPublicTradeList",
         "parameters": [
           {
             "name": "token",
             "in": "path",
             "required": true,
-            "description": "Trade list share token (UUID).",
-            "schema": { "type": "string", "format": "uuid" }
+            "description": "Trade list share token (UUID), taken from the share link (`/t/<token>`).",
+            "schema": { "type": "string", "format": "uuid" },
+            "example": "a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
           }
         ],
         "responses": {
@@ -112,7 +149,26 @@
             "description": "The public trade list.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/TradesResponse" }
+                "schema": { "$ref": "#/components/schemas/TradesResponse" },
+                "example": {
+                  "total_cards": 1,
+                  "cards": [
+                    {
+                      "card_id": "base1-4",
+                      "name": "Charizard",
+                      "game": "pokemon",
+                      "set_name": "Base Set",
+                      "set_code": "base1",
+                      "collector_number": "4",
+                      "rarity": "Rare Holo",
+                      "image_url": "http://localhost:3000/api/cards/image?id=base1-4",
+                      "quantity": 1,
+                      "finish": "nonfoil",
+                      "price": { "usd": 300.0, "usd_foil": null, "eur": null }
+                    }
+                  ],
+                  "attribution": "Card data and pricing courtesy of Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece). Binder is an independent, non-commercial tool and exposes only its own value-added layer (binders, holdings, valuation, price history)."
+                }
               }
             }
           },
@@ -120,10 +176,12 @@
             "description": "Trade list not found.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": { "code": "not_found", "message": "Trade list not found" } }
               }
             }
-          }
+          },
+          "429": { "$ref": "#/components/responses/RateLimited" }
         }
       }
     },
@@ -131,7 +189,7 @@
       "get": {
         "tags": ["Cards"],
         "summary": "Search the card catalog",
-        "description": "Searches Binder's normalized card catalog — every distinct card tracked in Binder, across all three games. Served from Binder's own data, not a live upstream search, so a card appears here once someone tracks it.",
+        "description": "Searches Binder's normalized card catalog — every distinct card tracked in Binder, across all three games. Served from Binder's own data, not a live upstream search, so a card appears here once someone tracks it. Cursor-paginated: follow `next_cursor` while `has_more` is true.",
         "operationId": "searchCards",
         "parameters": [
           {
@@ -139,28 +197,32 @@
             "in": "query",
             "required": false,
             "description": "Restrict results to one game.",
-            "schema": { "$ref": "#/components/schemas/Game" }
+            "schema": { "$ref": "#/components/schemas/Game" },
+            "example": "pokemon"
           },
           {
             "name": "q",
             "in": "query",
             "required": false,
             "description": "Case-insensitive substring match on the card name.",
-            "schema": { "type": "string" }
+            "schema": { "type": "string" },
+            "example": "charizard"
           },
           {
             "name": "limit",
             "in": "query",
             "required": false,
             "description": "Maximum number of cards to return in this page (1–100).",
-            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 }
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 },
+            "example": 50
           },
           {
             "name": "cursor",
             "in": "query",
             "required": false,
-            "description": "Opaque pagination cursor. Pass the `next_cursor` from the previous page to fetch the next one; omit for the first page.",
-            "schema": { "type": "string" }
+            "description": "Opaque pagination cursor. Pass the `next_cursor` from the previous page to fetch the next one; omit for the first page. Do not parse or construct it.",
+            "schema": { "type": "string" },
+            "example": "eyJuIjoiQ2hhcml6YXJkIiwiZyI6InBva2Vtb24iLCJjIjoiYmFzZTEtNCJ9"
           }
         ],
         "responses": {
@@ -168,7 +230,26 @@
             "description": "One page of matching catalog cards, ordered by name. Follow `next_cursor` while `has_more` is true.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/CardsResponse" }
+                "schema": { "$ref": "#/components/schemas/CardsResponse" },
+                "example": {
+                  "count": 1,
+                  "has_more": false,
+                  "next_cursor": null,
+                  "cards": [
+                    {
+                      "card_id": "base1-4",
+                      "name": "Charizard",
+                      "game": "pokemon",
+                      "set_name": "Base Set",
+                      "set_code": "base1",
+                      "collector_number": "4",
+                      "rarity": "Rare Holo",
+                      "image_url": "http://localhost:3000/api/cards/image?id=base1-4",
+                      "price": { "usd": 300.0, "usd_foil": null, "eur": null }
+                    }
+                  ],
+                  "attribution": "Card data and pricing courtesy of Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece). Binder is an independent, non-commercial tool and exposes only its own value-added layer (binders, holdings, valuation, price history)."
+                }
               }
             }
           },
@@ -176,24 +257,12 @@
             "description": "Unknown game or invalid cursor.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": { "code": "invalid_request", "message": "Unknown game; expected mtg, pokemon, or onepiece" } }
               }
             }
           },
-          "429": {
-            "description": "Rate limit exceeded (60 requests/minute per IP).",
-            "headers": {
-              "Retry-After": {
-                "description": "Seconds to wait before retrying.",
-                "schema": { "type": "integer" }
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
-              }
-            }
-          }
+          "429": { "$ref": "#/components/responses/RateLimited" }
         }
       }
     },
@@ -201,21 +270,24 @@
       "get": {
         "tags": ["Cards"],
         "summary": "Get a catalog card with price history",
-        "description": "Returns one card from the catalog in Binder's normalized model, with Binder's own daily USD price history for it (built from our snapshots, not upstream history). Returns 404 if no Binder user tracks the card.",
+        "description": "Returns one card from the catalog in Binder's normalized model, with Binder's own daily USD price history for it (built from our snapshots, not upstream history), one point per day, all-time. Returns 404 if no Binder user tracks the card.",
         "operationId": "getCard",
         "parameters": [
           {
             "name": "game",
             "in": "path",
             "required": true,
-            "schema": { "$ref": "#/components/schemas/Game" }
+            "description": "The game the card belongs to.",
+            "schema": { "$ref": "#/components/schemas/Game" },
+            "example": "pokemon"
           },
           {
             "name": "id",
             "in": "path",
             "required": true,
             "description": "The card's upstream id (Scryfall UUID, PokéWallet card id, or OPTCG card id).",
-            "schema": { "type": "string" }
+            "schema": { "type": "string" },
+            "example": "base1-4"
           }
         ],
         "responses": {
@@ -223,7 +295,25 @@
             "description": "The card and its price history.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/CardResponse" }
+                "schema": { "$ref": "#/components/schemas/CardResponse" },
+                "example": {
+                  "card": {
+                    "card_id": "base1-4",
+                    "name": "Charizard",
+                    "game": "pokemon",
+                    "set_name": "Base Set",
+                    "set_code": "base1",
+                    "collector_number": "4",
+                    "rarity": "Rare Holo",
+                    "image_url": "http://localhost:3000/api/cards/image?id=base1-4",
+                    "price": { "usd": 300.0, "usd_foil": null, "eur": null }
+                  },
+                  "history": [
+                    { "day": "2026-07-16", "price_usd": 295.0 },
+                    { "day": "2026-07-17", "price_usd": 300.0 }
+                  ],
+                  "attribution": "Card data and pricing courtesy of Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece). Binder is an independent, non-commercial tool and exposes only its own value-added layer (binders, holdings, valuation, price history)."
+                }
               }
             }
           },
@@ -231,10 +321,12 @@
             "description": "Card not found in catalog.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": { "code": "not_found", "message": "Card not found in catalog" } }
               }
             }
-          }
+          },
+          "429": { "$ref": "#/components/responses/RateLimited" }
         }
       }
     },
@@ -249,21 +341,25 @@
             "name": "game",
             "in": "path",
             "required": true,
-            "schema": { "$ref": "#/components/schemas/Game" }
+            "description": "The game the card belongs to.",
+            "schema": { "$ref": "#/components/schemas/Game" },
+            "example": "pokemon"
           },
           {
             "name": "id",
             "in": "path",
             "required": true,
             "description": "The card's upstream id (Scryfall UUID, PokéWallet card id, or OPTCG card id).",
-            "schema": { "type": "string" }
+            "schema": { "type": "string" },
+            "example": "base1-4"
           },
           {
             "name": "days",
             "in": "query",
             "required": false,
             "description": "Size of the history window in days (1–365).",
-            "schema": { "type": "integer", "minimum": 1, "maximum": 365, "default": 30 }
+            "schema": { "type": "integer", "minimum": 1, "maximum": 365, "default": 30 },
+            "example": 30
           }
         ],
         "responses": {
@@ -271,7 +367,17 @@
             "description": "Daily price history for the card.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/CardHistoryResponse" }
+                "schema": { "$ref": "#/components/schemas/CardHistoryResponse" },
+                "example": {
+                  "game": "pokemon",
+                  "card_id": "base1-4",
+                  "days": 30,
+                  "history": [
+                    { "day": "2026-07-16", "price_usd": 295.0 },
+                    { "day": "2026-07-17", "price_usd": 300.0 }
+                  ],
+                  "attribution": "Card data and pricing courtesy of Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece). Binder is an independent, non-commercial tool and exposes only its own value-added layer (binders, holdings, valuation, price history)."
+                }
               }
             }
           },
@@ -279,10 +385,12 @@
             "description": "Card not found in catalog.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": { "code": "not_found", "message": "Card not found in catalog" } }
               }
             }
-          }
+          },
+          "429": { "$ref": "#/components/responses/RateLimited" }
         }
       }
     },
@@ -290,7 +398,7 @@
       "get": {
         "tags": ["Playground"],
         "summary": "Try it: search the catalog (capped demo)",
-        "description": "A capped, no-setup way to try the catalog search from these docs. Returns the same normalized cards as `GET /api/v1/cards`, but is limited to **3 pulls per IP per day** so a public docs page can't become an uncapped API. Fill in `q` (and optionally `game`), watch the code sample update with your parameters, then Send to pull real card info. For real usage, call `/api/v1/cards` directly — it is cursor-paginated, allows 60 requests/minute, and has no daily cap.",
+        "description": "A capped, no-setup way to try the catalog search from these docs. Returns the same normalized cards as `GET /api/v1/cards`, but is limited to **3 pulls per IP per day** so a public docs page can't become an uncapped API. Fill in `q` (and optionally `game`), watch the code sample update with your parameters, then Send to pull real card info. For real usage, call `/api/v1/cards` directly — it is cursor-paginated, allows 60 requests/minute, and has no daily cap. This endpoint lives outside `/api/v1` and is not part of the stable public contract.",
         "operationId": "demoSearchCards",
         "parameters": [
           {
@@ -298,14 +406,16 @@
             "in": "query",
             "required": false,
             "description": "Case-insensitive substring match on the card name (e.g. \"charizard\"). Omit to return the whole catalog.",
-            "schema": { "type": "string" }
+            "schema": { "type": "string" },
+            "example": "charizard"
           },
           {
             "name": "game",
             "in": "query",
             "required": false,
             "description": "Restrict results to one game.",
-            "schema": { "$ref": "#/components/schemas/Game" }
+            "schema": { "$ref": "#/components/schemas/Game" },
+            "example": "pokemon"
           }
         ],
         "responses": {
@@ -313,7 +423,25 @@
             "description": "Matching catalog cards, plus how many demo pulls remain today.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/DemoCardsResponse" }
+                "schema": { "$ref": "#/components/schemas/DemoCardsResponse" },
+                "example": {
+                  "count": 1,
+                  "demo": { "limit": 3, "remaining": 2 },
+                  "cards": [
+                    {
+                      "card_id": "base1-4",
+                      "name": "Charizard",
+                      "game": "pokemon",
+                      "set_name": "Base Set",
+                      "set_code": "base1",
+                      "collector_number": "4",
+                      "rarity": "Rare Holo",
+                      "image_url": "http://localhost:3000/api/cards/image?id=base1-4",
+                      "price": { "usd": 300.0, "usd_foil": null, "eur": null }
+                    }
+                  ],
+                  "attribution": "Card data and pricing courtesy of Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece). Binder is an independent, non-commercial tool and exposes only its own value-added layer (binders, holdings, valuation, price history)."
+                }
               }
             }
           },
@@ -321,7 +449,8 @@
             "description": "Unknown game.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": { "code": "invalid_request", "message": "Unknown game; expected mtg, pokemon, or onepiece" } }
               }
             }
           },
@@ -330,12 +459,14 @@
             "headers": {
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
-                "schema": { "type": "integer" }
+                "schema": { "type": "integer" },
+                "example": 86400
               }
             },
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": { "code": "rate_limited", "message": "Demo limit reached — 3 card pulls per day from one address. Run Binder locally and call /api/v1/cards directly for unlimited access." } }
               }
             }
           }
@@ -346,6 +477,7 @@
       "get": {
         "tags": ["Meta"],
         "summary": "Get this OpenAPI document",
+        "description": "Returns this OpenAPI 3.0 document. Like every `/api/v1` endpoint it carries a weak `ETag` and is rate-limited per IP.",
         "operationId": "getOpenApi",
         "responses": {
           "200": {
@@ -355,48 +487,71 @@
                 "schema": { "type": "object" }
               }
             }
-          }
+          },
+          "429": { "$ref": "#/components/responses/RateLimited" }
         }
       }
     }
   },
   "components": {
+    "responses": {
+      "RateLimited": {
+        "description": "Rate limit exceeded (60 requests/minute per IP). Wait for the window to reset, then retry.",
+        "headers": {
+          "Retry-After": {
+            "description": "Seconds to wait before retrying.",
+            "schema": { "type": "integer" },
+            "example": 60
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": { "error": { "code": "rate_limited", "message": "Rate limit exceeded. Max 60 requests per minute." } }
+          }
+        }
+      }
+    },
     "schemas": {
       "Game": {
         "type": "string",
         "enum": ["mtg", "pokemon", "onepiece"],
-        "description": "The trading card game a binder or card belongs to."
+        "description": "The trading card game a binder or card belongs to.",
+        "example": "pokemon"
       },
       "Price": {
         "type": "object",
-        "description": "Current prices. Any field may be null when unavailable upstream.",
+        "description": "Current prices. Any field may be null when no price is known upstream — null means \"unknown\", never zero.",
         "properties": {
-          "usd": { "type": "number", "nullable": true },
-          "usd_foil": { "type": "number", "nullable": true },
-          "eur": { "type": "number", "nullable": true }
-        }
+          "usd": { "type": "number", "nullable": true, "example": 300.0 },
+          "usd_foil": { "type": "number", "nullable": true, "example": null },
+          "eur": { "type": "number", "nullable": true, "example": null }
+        },
+        "example": { "usd": 300.0, "usd_foil": null, "eur": null }
       },
       "Card": {
         "type": "object",
+        "description": "A card with holding context, as it appears inside a binder or trade list.",
         "properties": {
-          "card_id": { "type": "string" },
-          "name": { "type": "string" },
+          "card_id": { "type": "string", "example": "e3285e6b-3e79-4d7c-bf96-d920f973b122" },
+          "name": { "type": "string", "example": "Lightning Bolt" },
           "game": { "$ref": "#/components/schemas/Game" },
-          "set_name": { "type": "string" },
-          "set_code": { "type": "string" },
-          "collector_number": { "type": "string" },
-          "rarity": { "type": "string", "nullable": true },
-          "image_url": { "type": "string", "format": "uri", "nullable": true, "description": "Absolute URL to the card image (or null). Safe to fetch from any origin." },
-          "quantity": { "type": "integer", "minimum": 1 },
+          "set_name": { "type": "string", "example": "Magic 2010" },
+          "set_code": { "type": "string", "example": "m10" },
+          "collector_number": { "type": "string", "example": "146" },
+          "rarity": { "type": "string", "nullable": true, "example": "common" },
+          "image_url": { "type": "string", "format": "uri", "nullable": true, "description": "Absolute URL to the card image (or null). Safe to fetch from any origin.", "example": "https://cards.scryfall.io/normal/front/e/3/e3285e6b-3e79-4d7c-bf96-d920f973b122.jpg" },
+          "quantity": { "type": "integer", "minimum": 1, "example": 2 },
           "finish": {
             "type": "string",
             "enum": ["nonfoil", "foil"],
-            "description": "Which printing this holding is; foil values against price.usd_foil."
+            "description": "Which finish the owner holds. A foil holding values against price.usd_foil, a nonfoil against price.usd.",
+            "example": "nonfoil"
           },
-          "for_trade": { "type": "boolean", "description": "Present on binder responses; whether this holding is marked for trade." },
+          "for_trade": { "type": "boolean", "description": "Present on binder responses only; whether this holding is marked for trade. Omitted from trade-list responses, where every card is for trade.", "example": true },
           "price": { "$ref": "#/components/schemas/Price" }
         },
-        "required": ["card_id", "name", "game", "set_name", "quantity", "finish", "price"]
+        "required": ["card_id", "name", "game", "set_name", "set_code", "collector_number", "quantity", "finish", "price"]
       },
       "BinderResponse": {
         "type": "object",
@@ -404,66 +559,67 @@
           "binder": {
             "type": "object",
             "properties": {
-              "id": { "type": "string", "format": "uuid" },
-              "name": { "type": "string" },
+              "id": { "type": "string", "format": "uuid", "example": "3c90c3cc-0d44-4b50-8888-8dd25736052a" },
+              "name": { "type": "string", "example": "Modern staples" },
               "game": { "$ref": "#/components/schemas/Game" }
             },
             "required": ["id", "name", "game"]
           },
-          "card_count": { "type": "integer", "description": "Sum of holding quantities." },
-          "total_usd": { "type": "number", "description": "Current total USD value of the binder." },
+          "card_count": { "type": "integer", "description": "Sum of holding quantities.", "example": 2 },
+          "total_usd": { "type": "number", "description": "Current total USD value of the binder (foils valued at price.usd_foil).", "example": 5.0 },
           "holdings": {
             "type": "array",
             "items": { "$ref": "#/components/schemas/Card" }
           },
-          "attribution": { "type": "string" }
+          "attribution": { "type": "string", "example": "Card data and pricing courtesy of Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece). Binder is an independent, non-commercial tool and exposes only its own value-added layer (binders, holdings, valuation, price history)." }
         },
         "required": ["binder", "card_count", "total_usd", "holdings", "attribution"]
       },
       "CatalogCard": {
         "type": "object",
-        "description": "A card in Binder's normalized cross-game model, without holding context (no quantities — the catalog never exposes who holds a card or how many).",
+        "description": "A card in Binder's normalized cross-game model, without holding context (no quantity, finish, or for_trade — the catalog never exposes who holds a card or how many).",
         "properties": {
-          "card_id": { "type": "string" },
-          "name": { "type": "string" },
+          "card_id": { "type": "string", "example": "base1-4" },
+          "name": { "type": "string", "example": "Charizard" },
           "game": { "$ref": "#/components/schemas/Game" },
-          "set_name": { "type": "string" },
-          "set_code": { "type": "string" },
-          "collector_number": { "type": "string" },
-          "rarity": { "type": "string", "nullable": true },
-          "image_url": { "type": "string", "format": "uri", "nullable": true, "description": "Absolute URL to the card image (or null). Safe to fetch from any origin." },
+          "set_name": { "type": "string", "example": "Base Set" },
+          "set_code": { "type": "string", "example": "base1" },
+          "collector_number": { "type": "string", "example": "4" },
+          "rarity": { "type": "string", "nullable": true, "example": "Rare Holo" },
+          "image_url": { "type": "string", "format": "uri", "nullable": true, "description": "Absolute URL to the card image (or null). Safe to fetch from any origin.", "example": "http://localhost:3000/api/cards/image?id=base1-4" },
           "price": { "$ref": "#/components/schemas/Price" }
         },
-        "required": ["card_id", "name", "game", "set_name", "price"]
+        "required": ["card_id", "name", "game", "set_name", "set_code", "collector_number", "price"]
       },
       "CardsResponse": {
         "type": "object",
         "properties": {
-          "count": { "type": "integer", "description": "Number of cards in THIS page (not the catalog total)." },
-          "has_more": { "type": "boolean", "description": "Whether another page exists." },
+          "count": { "type": "integer", "description": "Number of cards in THIS page (not the catalog total).", "example": 1 },
+          "has_more": { "type": "boolean", "description": "Whether another page exists.", "example": false },
           "next_cursor": {
             "type": "string",
             "nullable": true,
-            "description": "Cursor for the next page, or null when has_more is false."
+            "description": "Opaque cursor for the next page, or null when has_more is false. Pass it back as `?cursor=`.",
+            "example": null
           },
           "cards": {
             "type": "array",
             "items": { "$ref": "#/components/schemas/CatalogCard" }
           },
-          "attribution": { "type": "string" }
+          "attribution": { "type": "string", "example": "Card data and pricing courtesy of Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece). Binder is an independent, non-commercial tool and exposes only its own value-added layer (binders, holdings, valuation, price history)." }
         },
         "required": ["count", "has_more", "next_cursor", "cards", "attribution"]
       },
       "DemoCardsResponse": {
         "type": "object",
         "properties": {
-          "count": { "type": "integer", "description": "Number of cards returned." },
+          "count": { "type": "integer", "description": "Number of cards returned.", "example": 1 },
           "demo": {
             "type": "object",
             "description": "Demo cap status for the calling IP.",
             "properties": {
               "limit": { "type": "integer", "description": "Total pulls allowed per day.", "example": 3 },
-              "remaining": { "type": "integer", "description": "Pulls left today for this IP." }
+              "remaining": { "type": "integer", "description": "Pulls left today for this IP.", "example": 2 }
             },
             "required": ["limit", "remaining"]
           },
@@ -471,15 +627,16 @@
             "type": "array",
             "items": { "$ref": "#/components/schemas/CatalogCard" }
           },
-          "attribution": { "type": "string" }
+          "attribution": { "type": "string", "example": "Card data and pricing courtesy of Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece). Binder is an independent, non-commercial tool and exposes only its own value-added layer (binders, holdings, valuation, price history)." }
         },
         "required": ["count", "demo", "cards", "attribution"]
       },
       "PricePoint": {
         "type": "object",
+        "description": "One day of a card's USD price history.",
         "properties": {
-          "day": { "type": "string", "format": "date", "example": "2026-07-01" },
-          "price_usd": { "type": "number" }
+          "day": { "type": "string", "format": "date", "example": "2026-07-17" },
+          "price_usd": { "type": "number", "example": 300.0 }
         },
         "required": ["day", "price_usd"]
       },
@@ -489,9 +646,10 @@
           "card": { "$ref": "#/components/schemas/CatalogCard" },
           "history": {
             "type": "array",
+            "description": "All-time daily USD price history, one point per day, oldest first.",
             "items": { "$ref": "#/components/schemas/PricePoint" }
           },
-          "attribution": { "type": "string" }
+          "attribution": { "type": "string", "example": "Card data and pricing courtesy of Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece). Binder is an independent, non-commercial tool and exposes only its own value-added layer (binders, holdings, valuation, price history)." }
         },
         "required": ["card", "history", "attribution"]
       },
@@ -499,45 +657,47 @@
         "type": "object",
         "properties": {
           "game": { "$ref": "#/components/schemas/Game" },
-          "card_id": { "type": "string" },
-          "days": { "type": "integer", "description": "The requested window size in days." },
+          "card_id": { "type": "string", "example": "base1-4" },
+          "days": { "type": "integer", "description": "The requested window size in days.", "example": 30 },
           "history": {
             "type": "array",
+            "description": "Daily USD price history within the window, one point per day, oldest first.",
             "items": { "$ref": "#/components/schemas/PricePoint" }
           },
-          "attribution": { "type": "string" }
+          "attribution": { "type": "string", "example": "Card data and pricing courtesy of Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece). Binder is an independent, non-commercial tool and exposes only its own value-added layer (binders, holdings, valuation, price history)." }
         },
         "required": ["game", "card_id", "days", "history", "attribution"]
       },
       "HistoryPoint": {
         "type": "object",
+        "description": "One day of a binder's total USD value.",
         "properties": {
-          "day": { "type": "string", "format": "date-time" },
-          "total_usd": { "type": "number" }
+          "day": { "type": "string", "format": "date-time", "example": "2026-07-17T00:00:00+00:00" },
+          "total_usd": { "type": "number", "example": 5.0 }
         },
         "required": ["day", "total_usd"]
       },
       "HistoryResponse": {
         "type": "object",
         "properties": {
-          "binder_id": { "type": "string", "format": "uuid" },
+          "binder_id": { "type": "string", "format": "uuid", "example": "3c90c3cc-0d44-4b50-8888-8dd25736052a" },
           "history": {
             "type": "array",
             "items": { "$ref": "#/components/schemas/HistoryPoint" }
           },
-          "attribution": { "type": "string" }
+          "attribution": { "type": "string", "example": "Card data and pricing courtesy of Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece). Binder is an independent, non-commercial tool and exposes only its own value-added layer (binders, holdings, valuation, price history)." }
         },
         "required": ["binder_id", "history", "attribution"]
       },
       "TradesResponse": {
         "type": "object",
         "properties": {
-          "total_cards": { "type": "integer" },
+          "total_cards": { "type": "integer", "example": 1 },
           "cards": {
             "type": "array",
             "items": { "$ref": "#/components/schemas/Card" }
           },
-          "attribution": { "type": "string" }
+          "attribution": { "type": "string", "example": "Card data and pricing courtesy of Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece). Binder is an independent, non-commercial tool and exposes only its own value-added layer (binders, holdings, valuation, price history)." }
         },
         "required": ["total_cards", "cards", "attribution"]
       },
@@ -550,9 +710,10 @@
               "code": {
                 "type": "string",
                 "enum": ["invalid_request", "not_found", "rate_limited", "internal"],
-                "description": "Stable machine-readable error code."
+                "description": "Stable machine-readable error code.",
+                "example": "not_found"
               },
-              "message": { "type": "string", "description": "Human-readable detail; may change." }
+              "message": { "type": "string", "description": "Human-readable detail; may change.", "example": "Binder not found or not public" }
             },
             "required": ["code", "message"]
           }

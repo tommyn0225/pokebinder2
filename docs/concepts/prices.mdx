@@ -1,0 +1,77 @@
+---
+title: Prices, finishes, and snapshots
+description: Where Binder's prices come from, what usd/usd_foil/eur and finish mean, why null is not zero, and how the daily snapshot history is built.
+---
+
+Every card in the API carries a `price`, and most carry a price `history`. This
+page explains what those numbers mean and where they come from.
+
+## Where prices come from
+
+Binder reads current prices from its three upstream sources — Scryfall (MTG),
+PokéWallet (Pokémon), and OPTCG API (One Piece) — through the same per-game
+adapters that build the [catalog](/concepts/catalog). Prices refresh daily. The
+API never proxies an upstream price call live; it serves the value Binder last
+recorded, which is why every response credits the sources in its `attribution`
+field.
+
+## The price object
+
+Every card has the same price shape:
+
+```json
+"price": { "usd": 300.0, "usd_foil": null, "eur": null }
+```
+
+- **`usd`** — current price of the standard (nonfoil) printing, in US dollars.
+- **`usd_foil`** — current price of the foil/holo printing, in US dollars.
+- **`eur`** — current price in euros (MTG, from Scryfall).
+
+Any field can be `null`.
+
+## Null means "unknown", never zero
+
+A `null` price means Binder has **no price for that field** — the upstream source
+doesn't provide one. It does **not** mean the card is worth nothing. Treat `null`
+as "no price known": show a dash, skip it in a sum, exclude it from an average.
+Rendering `null` as `$0.00` will silently understate a collection. This is why
+Binder's own valuation counts only cards that have a price, never coercing `null`
+to `0`.
+
+## Finish: which price applies
+
+A holding records which finish the owner has, as `finish`:
+
+- `"nonfoil"` → value it against `price.usd`.
+- `"foil"` → value it against `price.usd_foil`.
+
+Binder's binder and trade-list totals already do this — a foil holding is valued
+at `usd_foil`. If you compute your own totals from
+[binder or trade-list](/guides/display-a-binder) responses, branch on `finish`
+the same way, and fall back gracefully when the finish-appropriate price is
+`null`.
+
+The catalog itself has no finish (it's not a holding), so a
+[catalog card](/concepts/catalog) just carries both `usd` and `usd_foil` and
+leaves the choice to you.
+
+## Snapshots and history
+
+Once a day, Binder records the current price of every tracked card into its own
+history — the **snapshot** job. Over time this becomes Binder's own price
+history, built for free across all three games, and it's what the history
+endpoints serve:
+
+- `GET /api/v1/cards/{game}/{id}/history?days=N` — one card's daily USD history,
+  bounded by a window (see [Track a card's price over time](/guides/price-history)).
+- `GET /api/v1/cards/{game}/{id}` — the same history, all-time, alongside the card.
+- `GET /api/v1/binders/{id}/history` — a public binder's daily total value.
+
+Two things follow from the snapshots being daily:
+
+- **Granularity is one point per day.** Even when several users hold the same
+  card, its history has a single point per day.
+- **History starts when the first user tracks the card.** There is no backfill —
+  a card added today has its first snapshot tomorrow, and the series grows by one
+  point per day from there. A brand-new card returns a short (or empty) history,
+  not an error.

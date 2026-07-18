@@ -1,0 +1,110 @@
+---
+title: Conventions
+description: Errors, rate limits, caching, pagination, CORS, and attribution — the rules that hold across every Binder API endpoint.
+---
+
+Everything on this page holds for every endpoint under `/api/v1`. Read it once
+and you can call the whole API. The base URL in local development is
+`http://localhost:3000`, and no authentication is ever required.
+
+## Errors
+
+Every error uses one envelope:
+
+```json
+{ "error": { "code": "not_found", "message": "Binder not found or not public" } }
+```
+
+`code` is a stable machine-readable string — branch on it. `message` is
+human-readable and may change, so don't match on it.
+
+| Code | Status | Meaning | What to do |
+| ---- | ------ | ------- | ---------- |
+| `invalid_request` | `400` | A parameter is malformed — an unknown `game`, or a `cursor` you altered. | Fix the request. Use `mtg`, `pokemon`, or `onepiece` for `game`; pass cursors back verbatim. |
+| `not_found` | `404` | The resource doesn't exist, **or** exists but isn't public. | Check the id/token. Confirm the binder was made public; a card only enters the catalog once someone tracks it. |
+| `rate_limited` | `429` | You've exceeded 60 requests/minute from one IP. | Back off. Wait the number of seconds in the `Retry-After` header, then retry. |
+| `internal` | `500` | Something failed on our side. | Retry after a short delay. The failure is logged server-side; there's nothing to fix in your request. |
+
+<Note>
+  `404` deliberately covers both "doesn't exist" and "exists but isn't public."
+  The API never reveals which — a private binder is indistinguishable from one
+  that was never created.
+</Note>
+
+## Rate limits
+
+Requests to `/api/v1/*` are limited to **60 GET requests per minute per IP**.
+Over the limit, the API returns `429` with a `Retry-After` header (seconds) and
+the `rate_limited` code:
+
+```json
+{ "error": { "code": "rate_limited", "message": "Rate limit exceeded. Max 60 requests per minute." } }
+```
+
+The [demo endpoint](/guides/search-and-paginate) `/api/demo/cards` has its own
+separate cap — **3 pulls per IP per day** — because it powers a public "try it"
+button in these docs. For anything beyond a quick try, call `/api/v1/cards`
+directly; it has no daily cap.
+
+## Caching
+
+Every `/api/v1` GET carries a weak `ETag` and a `Cache-Control` header:
+
+```
+Cache-Control: public, max-age=300, stale-while-revalidate=3600
+ETag: W/"fbb4d020-783"
+```
+
+Send the `ETag` back as `If-None-Match` to skip re-downloading an unchanged
+body:
+
+```bash
+curl -H 'If-None-Match: W/"fbb4d020-783"' \
+  http://localhost:3000/api/v1/cards?limit=1
+# → HTTP/1.1 304 Not Modified   (empty body)
+```
+
+A `304` means your cached copy is still current. The demo endpoint is
+`Cache-Control: no-store` instead — it reports a per-request "pulls remaining"
+count, so it's never cached.
+
+## Pagination
+
+Only `/api/v1/cards` is paginated. It uses opaque cursors: each page returns
+`has_more` and `next_cursor`, and you pass `next_cursor` back as `?cursor=` to
+get the following page.
+
+```json
+{ "count": 50, "has_more": true, "next_cursor": "eyJuIjoi…", "cards": [ … ] }
+```
+
+- `count` is the number of items **in this page**, never the catalog total.
+- `next_cursor` is `null` when `has_more` is `false`.
+- Cursors are opaque — don't parse or construct them. They don't expire, but
+  they encode a position in the current ordering, so treat them as short-lived.
+
+The full loop is in [Search and paginate the catalog](/guides/search-and-paginate).
+
+## CORS
+
+CORS is open: `Access-Control-Allow-Origin: *`, methods `GET, OPTIONS` only.
+You can call the API directly from browser JavaScript on any origin. Preflight
+`OPTIONS` requests return `204`.
+
+## Attribution
+
+Every response carries an `attribution` string:
+
+```json
+"attribution": "Card data and pricing courtesy of Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece). Binder is an independent, non-commercial tool and exposes only its own value-added layer (binders, holdings, valuation, price history)."
+```
+
+This is a condition of Binder's upstream data sources, not decoration. If you
+build a UI on this data, keep the attribution visible.
+
+## The spec
+
+The machine-readable OpenAPI document is served at
+[`/api/v1/openapi.json`](http://localhost:3000/api/v1/openapi.json) and drives
+the **API reference** tab. It carries an `ETag` and is rate-limited like any
+other v1 endpoint.

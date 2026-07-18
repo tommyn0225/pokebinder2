@@ -1,0 +1,74 @@
+---
+title: Changelog
+description: Versioned history of the Binder Public API — what changed in each release, newest first.
+---
+
+The API's version is in `info.version` of the [OpenAPI document](http://localhost:3000/api/v1/openapi.json).
+Entries are newest first.
+
+<Update label="1.5.0" description="2026-07-18">
+  **Documentation and examples.** No API behavior change.
+
+  - Full docs rewrite: task-based [guides](/guides/search-and-paginate),
+    [concept](/concepts/catalog) pages, a single [conventions](/reference/conventions)
+    reference, and this changelog.
+  - Every OpenAPI schema property and parameter now carries a realistic
+    `example`, and every response (200 and errors) has a complete example body —
+    so the API reference playground prefills with real data.
+  - Documented that the 60 requests/minute rate limit applies to **every**
+    `/api/v1` endpoint (not only catalog search), with a shared `429` response.
+  - Marked `set_code` and `collector_number` as always-present (required) on card
+    schemas, matching what the API returns.
+</Update>
+
+<Update label="1.4.0" description="2026-07-17">
+  **Capped demo endpoint.**
+
+  - Added `GET /api/demo/cards`, a no-setup catalog search that powers the "try
+    it" button in these docs. Returns the same normalized cards as
+    `GET /api/v1/cards`, capped at **3 pulls per IP per day**. It lives outside
+    `/api/v1` and is not part of the stable public contract.
+</Update>
+
+<Update label="1.3.0" description="2026-07-17">
+  **Trade lists are always public.**
+
+  - Removed the public/private toggle from trade lists — a trade list only exists
+    to be shared, so any valid share token now resolves. (Binders keep their own
+    public/private toggle.)
+</Update>
+
+<Update label="1.2.0" description="2026-07-13 – 2026-07-16">
+  **Public API hardening.** Shipped incrementally under 1.2.0.
+
+  - **Cursor pagination** on `GET /api/v1/cards`: responses gained `has_more` and
+    `next_cursor`; `count` now means "items in this page". *(2026-07-13)*
+  - **Consistent error envelope** `{ "error": { "code", "message" } }` across
+    every endpoint, with codes `invalid_request`, `not_found`, `rate_limited`,
+    `internal`. *(2026-07-13)*
+  - **Caching**: every GET returns a weak `ETag`; `If-None-Match` yields `304 Not
+    Modified` when unchanged. *(2026-07-13)*
+  - **Rate limiting**: 60 GET requests/minute per IP, `429` with `Retry-After`,
+    fails open. *(2026-07-13)*
+  - **Per-card price history**: added `GET /api/v1/cards/{game}/{id}/history?days=N`.
+    *(2026-07-13)*
+  - **Absolute image URLs**: `image_url` is now an absolute URL that fetches from
+    any origin, with a placeholder when an image is missing. *(2026-07-16)*
+</Update>
+
+<Update label="1.1.0" description="2026-07-09">
+  **Normalized card catalog.**
+
+  - Added `GET /api/v1/cards` (search the catalog) and
+    `GET /api/v1/cards/{game}/{id}` (a card with its price history) — the
+    cross-game catalog you can build a collection app on.
+</Update>
+
+<Update label="1.0.0" description="2026-07-09">
+  **Initial public API.**
+
+  - `GET /api/v1/binders/{id}` — a public binder with holdings and total value.
+  - `GET /api/v1/binders/{id}/history` — a public binder's daily value history.
+  - `GET /api/v1/trades/{token}` — a public trade list.
+  - `GET /api/v1/openapi.json` — the machine-readable spec.
+</Update>

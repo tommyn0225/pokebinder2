@@ -1,11 +1,16 @@
 ---
 title: Introduction
-description: Read-only access to Binder's value-added collection layer.
+description: What the Binder Public API is — read-only, no-auth access to Binder's own value-added collection layer across MTG, Pokémon, and One Piece.
 ---
 
-The **Binder Public API** exposes Binder's own value-added layer — public binders,
-their valuation and price history, public trade lists, and Binder's normalized
-card catalog. It is read-only and requires no authentication.
+The **Binder Public API** exposes Binder's own value-added layer — public
+binders, their valuation and price history, public trade lists, and Binder's
+normalized card catalog. It is **read-only**, requires **no authentication**,
+returns **JSON**, and is **CORS-open** so you can call it straight from a browser
+app.
+
+The base URL in local development is `http://localhost:3000`. There are no API
+keys and no request body — every endpoint is a plain `GET`.
 
 ## What it is (and isn't)
 
@@ -14,10 +19,25 @@ Gathering), **PokéWallet** (Pokémon), and **OPTCG API** (One Piece). Their ter
 allow value-added apps, but not simply proxying or republishing their data.
 
 So this API serves **our layer** — binders, holdings, valuation, the price
-history we build ourselves from daily snapshots, and our normalized card
+history Binder builds itself from daily snapshots, and our normalized card
 catalog — and deliberately does **not** offer a live upstream card or price
-search passthrough. Every response includes an `attribution` field crediting
-the upstream sources.
+search passthrough. Every response includes an `attribution` field crediting the
+upstream sources, and keeping that attribution visible in anything you build is a
+condition of using the data.
+
+## What's public
+
+The API only returns resources that are public:
+
+- A **binder** its owner explicitly made public (binders have a public/private
+  toggle, and start private).
+- A **trade list** — trade lists are **always public** by design; there is no
+  private trade list.
+- The **card catalog**, which spans all users but never exposes who holds a card
+  or how many.
+
+Anything private — or that doesn't exist — returns `404`. The two cases are
+deliberately indistinguishable.
 
 ## Building on the catalog
 
@@ -25,20 +45,13 @@ Want to build your own collection app? The **card catalog** is the piece meant
 for you. It covers every card tracked in Binder, in one normalized model across
 all three games — same fields whether a card is MTG, Pokémon, or One Piece —
 plus a per-card daily USD price history that Binder builds itself. A card enters
-the catalog when any Binder user tracks it, so the catalog grows with the app;
-it is not an exhaustive index of every card ever printed. For that, go to the
+the catalog when any Binder user tracks it, so the catalog grows with the app; it
+is **not** an exhaustive index of every card ever printed. For that, go to the
 upstream sources directly ([Scryfall](https://scryfall.com/docs/api),
 [PokéWallet](https://www.pokewallet.io/api-docs),
 [OPTCG API](https://optcgapi.com/documentation)) — they're free, and it keeps
-everyone inside their terms of use.
-
-## Authentication
-
-None. There are no API keys.
-
-The API only returns resources whose owner has explicitly made them **public**
-(a public binder, or a trade list toggled to public). Anything private — or that
-doesn't exist — returns `404`.
+everyone inside their terms of use. See [How the catalog works](/concepts/catalog)
+for the full model.
 
 ## Base URL
 
@@ -60,9 +73,15 @@ http://localhost:3000
 | `GET` | `/api/v1/binders/{id}` | A public binder with holdings and total value |
 | `GET` | `/api/v1/binders/{id}/history` | A public binder's daily value history |
 | `GET` | `/api/v1/trades/{token}` | A public trade list |
-| `GET` | `/api/v1/cards` | Search the normalized card catalog |
+| `GET` | `/api/v1/cards` | Search the normalized card catalog (paginated) |
 | `GET` | `/api/v1/cards/{game}/{id}` | A catalog card with our daily price history |
+| `GET` | `/api/v1/cards/{game}/{id}/history` | A card's price history over a window |
 | `GET` | `/api/v1/openapi.json` | This OpenAPI document |
+| `GET` | `/api/demo/cards` | Capped catalog search that powers the docs "try it" button |
 
-See the [Quickstart](/quickstart) for end-to-end examples, or the
-**API reference** tab for the full schema.
+## Next steps
+
+- [Quickstart](/quickstart) — call every endpoint end to end, in order.
+- [Conventions](/reference/conventions) — errors, rate limits, caching, and
+  pagination in one place.
+- The **API reference** tab — the full schema, with an interactive playground.

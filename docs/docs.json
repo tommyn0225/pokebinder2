@@ -68,6 +68,22 @@
           {
             "group": "Getting started",
             "pages": ["introduction", "quickstart"]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/search-and-paginate",
+              "guides/price-history",
+              "guides/display-a-binder"
+            ]
+          },
+          {
+            "group": "Concepts",
+            "pages": ["concepts/catalog", "concepts/prices"]
+          },
+          {
+            "group": "Reference",
+            "pages": ["reference/conventions", "reference/changelog"]
           }
         ]
       },
@@ -76,6 +92,11 @@
         "openapi": "openapi.json"
       }
     ]
+  },
+  "feedback": {
+    "thumbsRating": true,
+    "suggestEdit": true,
+    "raiseIssue": true
   },
   "footer": {
     "socials": {

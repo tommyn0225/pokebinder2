@@ -1,91 +1,118 @@
 ---
 title: Quickstart
-description: Fetch a public binder, its history, and a trade list.
+description: Call every Binder API endpoint end to end in one sitting — public binder, its history, a trade list, catalog search, a card, and card history.
 ---
 
-Every endpoint is a plain `GET` that returns JSON. No headers or keys are needed.
+This walks through every endpoint in order. Each step is a single `curl` against
+`http://localhost:3000` — no keys, no headers, no request body. Run them top to
+bottom.
 
-## 1. Make something public
+## 1. Run Binder locally
 
-The API only sees public resources:
-
-- **A binder** — open it in the app and choose **Make public**. Its share link
-  looks like `/(b)/<binder-id>`; the `<binder-id>` is what you pass below.
-- **A trade list** — open **View trades** and copy the share link
-  `/(t)/<token>`; the `<token>` is what you pass below. Trade lists are always
-  public, so the link works as soon as you have it.
-
-## 2. Get a public binder
+The API is served by the Binder app. Start it:
 
 ```bash
-curl http://localhost:3000/api/v1/binders/<binder-id>
+npm run dev
+```
+
+It comes up on `http://localhost:3000`. Confirm the API is live:
+
+```bash
+curl http://localhost:3000/api/v1/openapi.json
+```
+
+You should get the OpenAPI document back as JSON.
+
+## 2. Make a binder public
+
+The binder endpoints only return **public** binders. In the app, open a binder
+and choose **Make public**, then copy its share link — it looks like
+`/b/<binder-id>`. The `<binder-id>` is a UUID; that's what you pass below.
+
+Trade lists need no such step: they are **always public**. Open **View trades**
+and copy the share link `/t/<token>`; it works as soon as you have it.
+
+Throughout this guide the placeholder binder id is
+`3c90c3cc-0d44-4b50-8888-8dd25736052a` and the placeholder trade token is
+`a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d`. Substitute your own.
+
+## 3. Get the public binder
+
+```bash
+curl http://localhost:3000/api/v1/binders/3c90c3cc-0d44-4b50-8888-8dd25736052a
 ```
 
 ```json
 {
-  "binder": { "id": "…", "name": "My MTG binder", "game": "mtg" },
-  "card_count": 12,
-  "total_usd": 84.5,
+  "binder": { "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a", "name": "Modern staples", "game": "mtg" },
+  "card_count": 2,
+  "total_usd": 5.0,
   "holdings": [
     {
-      "card_id": "…",
+      "card_id": "e3285e6b-3e79-4d7c-bf96-d920f973b122",
       "name": "Lightning Bolt",
       "game": "mtg",
-      "set_name": "Magic 2011",
-      "set_code": "m11",
-      "collector_number": "149",
+      "set_name": "Magic 2010",
+      "set_code": "m10",
+      "collector_number": "146",
       "rarity": "common",
-      "image_url": "https://…",
+      "image_url": "https://cards.scryfall.io/normal/front/e/3/e3285e6b-3e79-4d7c-bf96-d920f973b122.jpg",
       "quantity": 2,
       "finish": "nonfoil",
       "for_trade": true,
-      "price": { "usd": 1.25, "usd_foil": 6.0, "eur": 1.1 }
+      "price": { "usd": 2.5, "usd_foil": 8.0, "eur": 2.1 }
     }
   ],
   "attribution": "Card data and pricing courtesy of Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece)…"
 }
 ```
 
-A missing or private binder returns `404` with the standard error envelope:
+A missing or private binder returns `404` with the standard
+[error envelope](/reference/conventions#errors):
 
 ```json
 { "error": { "code": "not_found", "message": "Binder not found or not public" } }
 ```
 
-## 3. Get a binder's value history
+## 4. Get the binder's value history
 
-Binder's own daily snapshots — not upstream history.
+Binder's own daily snapshots — not upstream history. One point per day the
+binder has been tracked.
 
 ```bash
-curl http://localhost:3000/api/v1/binders/<binder-id>/history
+curl http://localhost:3000/api/v1/binders/3c90c3cc-0d44-4b50-8888-8dd25736052a/history
 ```
 
 ```json
 {
-  "binder_id": "…",
+  "binder_id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
   "history": [
-    { "day": "2026-07-01T00:00:00+00:00", "total_usd": 80.0 },
-    { "day": "2026-07-02T00:00:00+00:00", "total_usd": 84.5 }
+    { "day": "2026-07-16T00:00:00+00:00", "total_usd": 4.98 },
+    { "day": "2026-07-17T00:00:00+00:00", "total_usd": 5.0 }
   ],
   "attribution": "…"
 }
 ```
 
-## 4. Get a public trade list
+## 5. Get a public trade list
 
 ```bash
-curl http://localhost:3000/api/v1/trades/<token>
+curl http://localhost:3000/api/v1/trades/a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d
 ```
 
 ```json
 {
-  "total_cards": 5,
+  "total_cards": 1,
   "cards": [
     {
-      "card_id": "…",
+      "card_id": "base1-4",
       "name": "Charizard",
       "game": "pokemon",
       "set_name": "Base Set",
+      "set_code": "base1",
+      "collector_number": "4",
+      "rarity": "Rare Holo",
+      "image_url": "http://localhost:3000/api/cards/image?id=base1-4",
       "quantity": 1,
       "finish": "nonfoil",
       "price": { "usd": 300.0, "usd_foil": null, "eur": null }
@@ -95,10 +122,13 @@ curl http://localhost:3000/api/v1/trades/<token>
 }
 ```
 
-## 5. Search the card catalog
+Every card in a trade list is for trade, so these cards omit the `for_trade`
+flag that binder holdings carry.
 
-The catalog needs no IDs at all — it's every card tracked in Binder, in one
-normalized model across all three games:
+## 6. Search the card catalog
+
+The catalog needs no ids — it's every card tracked in Binder, in one normalized
+model across all three games:
 
 ```bash
 curl "http://localhost:3000/api/v1/cards?q=charizard&game=pokemon"
@@ -118,7 +148,7 @@ curl "http://localhost:3000/api/v1/cards?q=charizard&game=pokemon"
       "set_code": "base1",
       "collector_number": "4",
       "rarity": "Rare Holo",
-      "image_url": "https://…",
+      "image_url": "http://localhost:3000/api/cards/image?id=base1-4",
       "price": { "usd": 300.0, "usd_foil": null, "eur": null }
     }
   ],
@@ -128,17 +158,13 @@ curl "http://localhost:3000/api/v1/cards?q=charizard&game=pokemon"
 
 `game` and `q` are optional; `limit` sets the page size (default 50, max 100).
 `count` is the number of cards in **this page**, not the catalog total. When
-`has_more` is true, pass `next_cursor` back as `?cursor=…` to fetch the next
-page:
+`has_more` is true, pass `next_cursor` back as `?cursor=…`. The full loop is in
+[Search and paginate the catalog](/guides/search-and-paginate).
 
-```bash
-curl "http://localhost:3000/api/v1/cards?q=charizard&cursor=<next_cursor>"
-```
-
-## 6. Get one card with its price history
+## 7. Get one card with its price history
 
 Use a `card_id` from the search above. The history is Binder's own daily
-snapshots, one point per day:
+snapshots, one point per day, all-time:
 
 ```bash
 curl http://localhost:3000/api/v1/cards/pokemon/base1-4
@@ -146,10 +172,10 @@ curl http://localhost:3000/api/v1/cards/pokemon/base1-4
 
 ```json
 {
-  "card": { "card_id": "base1-4", "name": "Charizard", "game": "pokemon", "…": "…" },
+  "card": { "card_id": "base1-4", "name": "Charizard", "game": "pokemon", "set_name": "Base Set", "set_code": "base1", "collector_number": "4", "rarity": "Rare Holo", "image_url": "http://localhost:3000/api/cards/image?id=base1-4", "price": { "usd": 300.0, "usd_foil": null, "eur": null } },
   "history": [
-    { "day": "2026-07-01", "price_usd": 295.0 },
-    { "day": "2026-07-02", "price_usd": 300.0 }
+    { "day": "2026-07-16", "price_usd": 295.0 },
+    { "day": "2026-07-17", "price_usd": 300.0 }
   ],
   "attribution": "…"
 }
@@ -161,10 +187,9 @@ A card no Binder user tracks returns `404`:
 { "error": { "code": "not_found", "message": "Card not found in catalog" } }
 ```
 
-## 7. Get a card's price history over a window
+## 8. Get a card's price history over a window
 
-Binder's own daily snapshots for one card, bounded by `days` (default 30, max
-365) — one point per day:
+Same history, bounded by `days` (default 30, max 365):
 
 ```bash
 curl "http://localhost:3000/api/v1/cards/pokemon/base1-4/history?days=7"
@@ -176,22 +201,38 @@ curl "http://localhost:3000/api/v1/cards/pokemon/base1-4/history?days=7"
   "card_id": "base1-4",
   "days": 7,
   "history": [
-    { "day": "2026-07-07", "price_usd": 298.0 },
-    { "day": "2026-07-08", "price_usd": 300.0 }
+    { "day": "2026-07-16", "price_usd": 295.0 },
+    { "day": "2026-07-17", "price_usd": 300.0 }
   ],
   "attribution": "…"
 }
 ```
 
-## Notes
+## 9. Try it with zero setup
 
-- Every error uses the envelope `{ "error": { "code", "message" } }`. Codes:
-  `invalid_request`, `not_found`, `rate_limited`, `internal`.
-- Requests are rate-limited per IP (60/minute). Over the limit returns `429`
-  with a `Retry-After` header.
-- Responses are cached for 5 minutes (`Cache-Control: public, max-age=300`) and
-  carry a weak `ETag`. Send it back as `If-None-Match` to get a `304 Not
-  Modified` when nothing changed.
-- CORS is open (`Access-Control-Allow-Origin: *`) so you can call the API from a
-  browser app.
-- The machine-readable spec is at `/api/v1/openapi.json`.
+Don't want to run the app? The docs **API reference** tab has an interactive
+playground, and the `/api/demo/cards` endpoint pulls real catalog cards without
+any setup — capped at 3 pulls per IP per day:
+
+```bash
+curl "http://localhost:3000/api/demo/cards?q=charizard&game=pokemon"
+```
+
+```json
+{
+  "count": 1,
+  "demo": { "limit": 3, "remaining": 2 },
+  "cards": [ { "card_id": "base1-4", "name": "Charizard", "game": "pokemon", "…": "…" } ],
+  "attribution": "…"
+}
+```
+
+## Where next
+
+- [Search and paginate the catalog](/guides/search-and-paginate) — walk the
+  whole catalog with cursors.
+- [Track a card's price over time](/guides/price-history) — turn history into a
+  chart.
+- [Display a public binder or trade list](/guides/display-a-binder) — render
+  someone's cards on your own site.
+- [Conventions](/reference/conventions) — errors, rate limits, caching, CORS.

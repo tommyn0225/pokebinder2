@@ -1,0 +1,120 @@
+---
+title: Display a public binder or trade list
+description: Fetch a public binder or trade list and render its cards on your own site, valuing foils correctly and keeping attribution visible.
+---
+
+Both public binders and trade lists return a list of cards with images and
+prices, so you can render someone's collection on your own page. This guide
+fetches one and builds a simple card list. The endpoints are
+`GET /api/v1/binders/{id}` and `GET /api/v1/trades/{token}` on
+`http://localhost:3000`, no auth.
+
+## Get the id or token from a share link
+
+Both resources are addressed by a value pulled from a share link:
+
+- **Binder** — the owner makes it public in the app and shares `/b/<id>`. The
+  `<id>` is a UUID.
+- **Trade list** — trade lists are always public; the owner shares `/t/<token>`.
+  The `<token>` is a UUID.
+
+```bash
+curl http://localhost:3000/api/v1/binders/3c90c3cc-0d44-4b50-8888-8dd25736052a
+```
+
+```json
+{
+  "binder": { "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a", "name": "Modern staples", "game": "mtg" },
+  "card_count": 2,
+  "total_usd": 5.0,
+  "holdings": [
+    {
+      "card_id": "e3285e6b-3e79-4d7c-bf96-d920f973b122",
+      "name": "Lightning Bolt",
+      "game": "mtg",
+      "set_name": "Magic 2010",
+      "set_code": "m10",
+      "collector_number": "146",
+      "rarity": "common",
+      "image_url": "https://cards.scryfall.io/normal/front/e/3/e3285e6b-3e79-4d7c-bf96-d920f973b122.jpg",
+      "quantity": 2,
+      "finish": "nonfoil",
+      "for_trade": true,
+      "price": { "usd": 2.5, "usd_foil": 8.0, "eur": 2.1 }
+    }
+  ],
+  "attribution": "Card data and pricing courtesy of Scryfall (MTG), PokéWallet (Pokémon), and OPTCG API (One Piece)…"
+}
+```
+
+A trade list has the same card shape under `cards`, minus the `for_trade` flag
+(every card there is for trade) and with a `total_cards` count instead of
+`card_count`/`total_usd`.
+
+## Fields that matter for rendering
+
+- **`image_url`** is an absolute URL and safe to fetch cross-origin, so you can
+  drop it straight into an `<img src>`. It may be `null` — fall back to a
+  placeholder.
+- **`finish`** is `"nonfoil"` or `"foil"`. Value a foil holding against
+  `price.usd_foil`, a nonfoil against `price.usd`. See
+  [Prices, finishes, and snapshots](/concepts/prices).
+- **`price.usd` may be `null`** — that means "no price known", not zero. Show a
+  dash, not `$0.00`.
+- **`for_trade`** (binders only) flags which holdings the owner will trade.
+- **`attribution`** must stay visible in any UI you build on this data.
+
+## Render it (HTML + JS)
+
+A self-contained page that fetches a binder and lists its cards, valuing each by
+finish and keeping attribution on screen:
+
+```html
+<!doctype html>
+<div id="binder"></div>
+
+<script>
+  const BINDER_ID = "3c90c3cc-0d44-4b50-8888-8dd25736052a";
+
+  function unitPrice(card) {
+    const p = card.finish === "foil" ? card.price.usd_foil : card.price.usd;
+    return p; // may be null → "no price known"
+  }
+
+  function money(n) {
+    return n == null ? "—" : `$${n.toFixed(2)}`;
+  }
+
+  async function render() {
+    const res = await fetch(`http://localhost:3000/api/v1/binders/${BINDER_ID}`);
+    if (!res.ok) {
+      const { error } = await res.json();
+      document.getElementById("binder").textContent =
+        `Couldn't load binder: ${error.message}`;
+      return;
+    }
+    const data = await res.json();
+
+    const rows = data.holdings
+      .map((card) => {
+        const img = card.image_url
+          ? `<img src="${card.image_url}" alt="${card.name}" width="60">`
+          : `<span>No image</span>`;
+        const foil = card.finish === "foil" ? " (foil)" : "";
+        return `<li>${img} ${card.name}${foil} ×${card.quantity} — ${money(unitPrice(card))}</li>`;
+      })
+      .join("");
+
+    document.getElementById("binder").innerHTML = `
+      <h2>${data.binder.name} — ${money(data.total_usd)}</h2>
+      <ul>${rows}</ul>
+      <footer><small>${data.attribution}</small></footer>
+    `;
+  }
+
+  render();
+</script>
+```
+
+Swap the `binders/${BINDER_ID}` path for `trades/${TOKEN}` and read `data.cards`
+instead of `data.holdings` to render a trade list the same way.

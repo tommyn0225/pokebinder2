@@ -1,0 +1,66 @@
+---
+title: How the catalog works
+description: What Binder's card catalog is — a usage-grown, normalized cross-game index of tracked cards — and how card identity works across MTG, Pokémon, and One Piece.
+---
+
+The catalog is the piece of the API meant for building on. This page explains
+what it contains, how cards are identified, and what it deliberately leaves out.
+
+## Every tracked card, normalized
+
+The catalog is **every distinct card any Binder user tracks**, mapped into one
+normalized model that's identical across all three games. Whether a card is MTG,
+Pokémon, or One Piece, it has the same fields: `card_id`, `name`, `game`,
+`set_name`, `set_code`, `collector_number`, `rarity`, `image_url`, and `price`.
+Binder builds this by running each upstream source (Scryfall, PokéWallet, OPTCG
+API) through a per-game adapter into the shared model, so you write one
+integration instead of three.
+
+Search and page through it with `GET /api/v1/cards` — see
+[Search and paginate the catalog](/guides/search-and-paginate).
+
+## It grows with usage
+
+A card enters the catalog the moment a Binder user first tracks it. That has two
+consequences worth designing around:
+
+- The catalog is **not an exhaustive index** of every card ever printed. If a
+  card no one holds isn't there, that's expected, not a bug — the same-shaped
+  `404` you'd get for a private resource.
+- The catalog **grows over time** as people add cards. A query that returns
+  nothing today may return results later.
+
+If you need a complete index of a game's cards, go to the upstream sources
+directly ([Scryfall](https://scryfall.com/docs/api),
+[PokéWallet](https://www.pokewallet.io/api-docs),
+[OPTCG API](https://optcgapi.com/documentation)). Binder's catalog is a
+value-added layer on top of them, not a replacement — which is what keeps
+everyone inside those sources' terms of use.
+
+## Card identity
+
+A card is identified by two things together: its `game` and its `card_id`. The
+`card_id` is the card's **upstream-native id**, carried through unchanged:
+
+| Game | `game` | `card_id` shape | Example |
+| ---- | ------ | --------------- | ------- |
+| Magic: The Gathering | `mtg` | Scryfall UUID | `e3285e6b-3e79-4d7c-bf96-d920f973b122` |
+| Pokémon | `pokemon` | PokéWallet card id | `base1-4` |
+| One Piece | `onepiece` | OPTCG card id | `OP01-001` |
+
+Because ids are upstream-native, they're stable and you can cross-reference them
+back to the source. Every per-card endpoint takes them in this order —
+`/api/v1/cards/{game}/{id}`.
+
+Each catalog entry is one **specific printing** of a card. Two printings of
+"Lightning Bolt" from different sets are two catalog entries with different
+`card_id`s and different prices — the catalog never collapses them into one.
+
+## What never leaks
+
+The catalog spans all users, so it exposes only the normalized card itself —
+never holding context. There is no quantity, no finish, no owner, and no
+"who holds this" anywhere in a catalog response. Those fields live only on
+[binder and trade-list](/guides/display-a-binder) responses, which are scoped to
+a single public resource its owner chose to share. Private portfolio data — what
+a user paid, their gains — never appears in the public API at all.
