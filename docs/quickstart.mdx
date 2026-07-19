@@ -4,24 +4,24 @@ description: Call every Binder API endpoint end to end in one sitting — public
 ---
 
 This walks through every endpoint in order. Each step is a single `curl` against
-`http://localhost:3000` — no keys, no headers, no request body. Run them top to
-bottom.
+`https://v0-pokebinder.vercel.app` — no keys, no headers, no request body, no
+setup. Run them top to bottom.
 
-## 1. Run Binder locally
+## 1. Confirm the API is live
 
-The API is served by the Binder app. Start it:
-
-```bash
-npm run dev
-```
-
-It comes up on `http://localhost:3000`. Confirm the API is live:
+The API is public and hosted, so there's nothing to install. Confirm it responds:
 
 ```bash
-curl http://localhost:3000/api/v1/openapi.json
+curl https://v0-pokebinder.vercel.app/api/v1/openapi.json
 ```
 
 You should get the OpenAPI document back as JSON.
+
+<Note>
+  Prefer to run Binder yourself? Start it with `npm run dev` and use
+  `http://localhost:3000` as the base URL instead — every command below works the
+  same way.
+</Note>
 
 ## 2. Make a binder public
 
@@ -39,7 +39,7 @@ Throughout this guide the placeholder binder id is
 ## 3. Get the public binder
 
 ```bash
-curl http://localhost:3000/api/v1/binders/3c90c3cc-0d44-4b50-8888-8dd25736052a
+curl https://v0-pokebinder.vercel.app/api/v1/binders/3c90c3cc-0d44-4b50-8888-8dd25736052a
 ```
 
 ```json
@@ -80,7 +80,7 @@ Binder's own daily snapshots — not upstream history. One point per day the
 binder has been tracked.
 
 ```bash
-curl http://localhost:3000/api/v1/binders/3c90c3cc-0d44-4b50-8888-8dd25736052a/history
+curl https://v0-pokebinder.vercel.app/api/v1/binders/3c90c3cc-0d44-4b50-8888-8dd25736052a/history
 ```
 
 ```json
@@ -97,7 +97,7 @@ curl http://localhost:3000/api/v1/binders/3c90c3cc-0d44-4b50-8888-8dd25736052a/h
 ## 5. Get a public trade list
 
 ```bash
-curl http://localhost:3000/api/v1/trades/a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+curl https://v0-pokebinder.vercel.app/api/v1/trades/a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d
 ```
 
 ```json
@@ -112,7 +112,7 @@ curl http://localhost:3000/api/v1/trades/a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d
       "set_code": "base1",
       "collector_number": "4",
       "rarity": "Rare Holo",
-      "image_url": "http://localhost:3000/api/cards/image?id=base1-4",
+      "image_url": "https://v0-pokebinder.vercel.app/api/cards/image?id=base1-4",
       "quantity": 1,
       "finish": "nonfoil",
       "price": { "usd": 300.0, "usd_foil": null, "eur": null }
@@ -131,7 +131,7 @@ The catalog needs no ids — it's every card tracked in Binder, in one normalize
 model across all three games:
 
 ```bash
-curl "http://localhost:3000/api/v1/cards?q=charizard&game=pokemon"
+curl "https://v0-pokebinder.vercel.app/api/v1/cards?q=charizard&game=pokemon"
 ```
 
 ```json
@@ -148,7 +148,7 @@ curl "http://localhost:3000/api/v1/cards?q=charizard&game=pokemon"
       "set_code": "base1",
       "collector_number": "4",
       "rarity": "Rare Holo",
-      "image_url": "http://localhost:3000/api/cards/image?id=base1-4",
+      "image_url": "https://v0-pokebinder.vercel.app/api/cards/image?id=base1-4",
       "price": { "usd": 300.0, "usd_foil": null, "eur": null }
     }
   ],
@@ -167,12 +167,12 @@ Use a `card_id` from the search above. The history is Binder's own daily
 snapshots, one point per day, all-time:
 
 ```bash
-curl http://localhost:3000/api/v1/cards/pokemon/base1-4
+curl https://v0-pokebinder.vercel.app/api/v1/cards/pokemon/base1-4
 ```
 
 ```json
 {
-  "card": { "card_id": "base1-4", "name": "Charizard", "game": "pokemon", "set_name": "Base Set", "set_code": "base1", "collector_number": "4", "rarity": "Rare Holo", "image_url": "http://localhost:3000/api/cards/image?id=base1-4", "price": { "usd": 300.0, "usd_foil": null, "eur": null } },
+  "card": { "card_id": "base1-4", "name": "Charizard", "game": "pokemon", "set_name": "Base Set", "set_code": "base1", "collector_number": "4", "rarity": "Rare Holo", "image_url": "https://v0-pokebinder.vercel.app/api/cards/image?id=base1-4", "price": { "usd": 300.0, "usd_foil": null, "eur": null } },
   "history": [
     { "day": "2026-07-16", "price_usd": 295.0 },
     { "day": "2026-07-17", "price_usd": 300.0 }
@@ -192,7 +192,7 @@ A card no Binder user tracks returns `404`:
 Same history, bounded by `days` (default 30, max 365):
 
 ```bash
-curl "http://localhost:3000/api/v1/cards/pokemon/base1-4/history?days=7"
+curl "https://v0-pokebinder.vercel.app/api/v1/cards/pokemon/base1-4/history?days=7"
 ```
 
 ```json
@@ -215,7 +215,7 @@ playground, and the `/api/demo/cards` endpoint pulls real catalog cards without
 any setup — capped at 3 pulls per IP per day:
 
 ```bash
-curl "http://localhost:3000/api/demo/cards?q=charizard&game=pokemon"
+curl "https://v0-pokebinder.vercel.app/api/demo/cards?q=charizard&game=pokemon"
 ```
 
 ```json

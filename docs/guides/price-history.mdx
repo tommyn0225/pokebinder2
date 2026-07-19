@@ -6,7 +6,7 @@ description: Fetch a card's daily USD price history from Binder's own snapshots 
 Binder snapshots the price of every tracked card once a day and builds its own
 history — independent of any upstream's paid history. This guide pulls a card's
 history over a window and shapes it for a chart. The endpoint is
-`GET /api/v1/cards/{game}/{id}/history` on `http://localhost:3000`, no auth.
+`GET /api/v1/cards/{game}/{id}/history` on `https://v0-pokebinder.vercel.app`, no auth.
 
 ## Fetch a window of history
 
@@ -14,7 +14,7 @@ Pass `days` (1–365, default 30) to bound the window. The response has one poin
 per day, oldest first:
 
 ```bash
-curl "http://localhost:3000/api/v1/cards/pokemon/base1-4/history?days=30"
+curl "https://v0-pokebinder.vercel.app/api/v1/cards/pokemon/base1-4/history?days=30"
 ```
 
 ```json
@@ -41,7 +41,7 @@ straight across:
 
 ```js
 async function priceSeries(game, cardId, days = 30) {
-  const url = `http://localhost:3000/api/v1/cards/${game}/${cardId}/history?days=${days}`;
+  const url = `https://v0-pokebinder.vercel.app/api/v1/cards/${game}/${cardId}/history?days=${days}`;
   const res = await fetch(url);
 
   if (res.status === 404) {

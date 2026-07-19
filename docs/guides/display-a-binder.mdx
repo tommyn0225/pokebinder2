@@ -7,7 +7,7 @@ Both public binders and trade lists return a list of cards with images and
 prices, so you can render someone's collection on your own page. This guide
 fetches one and builds a simple card list. The endpoints are
 `GET /api/v1/binders/{id}` and `GET /api/v1/trades/{token}` on
-`http://localhost:3000`, no auth.
+`https://v0-pokebinder.vercel.app`, no auth.
 
 ## Get the id or token from a share link
 
@@ -19,7 +19,7 @@ Both resources are addressed by a value pulled from a share link:
   The `<token>` is a UUID.
 
 ```bash
-curl http://localhost:3000/api/v1/binders/3c90c3cc-0d44-4b50-8888-8dd25736052a
+curl https://v0-pokebinder.vercel.app/api/v1/binders/3c90c3cc-0d44-4b50-8888-8dd25736052a
 ```
 
 ```json
@@ -86,7 +86,7 @@ finish and keeping attribution on screen:
   }
 
   async function render() {
-    const res = await fetch(`http://localhost:3000/api/v1/binders/${BINDER_ID}`);
+    const res = await fetch(`https://v0-pokebinder.vercel.app/api/v1/binders/${BINDER_ID}`);
     if (!res.ok) {
       const { error } = await res.json();
       document.getElementById("binder").textContent =

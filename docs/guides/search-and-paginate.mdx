@@ -5,7 +5,7 @@ description: Find a card in Binder's catalog, filter by game, and walk every pag
 
 The catalog is every distinct card any Binder user tracks, in one normalized
 cross-game model. This guide finds a card, then walks the entire catalog page by
-page. The endpoint is `GET /api/v1/cards` on `http://localhost:3000`, no auth.
+page. The endpoint is `GET /api/v1/cards` on `https://v0-pokebinder.vercel.app`, no auth.
 
 ## Find a card
 
@@ -13,7 +13,7 @@ Pass `q` for a case-insensitive substring match on the name, and optionally
 `game` to restrict to `mtg`, `pokemon`, or `onepiece`:
 
 ```bash
-curl "http://localhost:3000/api/v1/cards?q=charizard&game=pokemon"
+curl "https://v0-pokebinder.vercel.app/api/v1/cards?q=charizard&game=pokemon"
 ```
 
 ```json
@@ -30,7 +30,7 @@ curl "http://localhost:3000/api/v1/cards?q=charizard&game=pokemon"
       "set_code": "base1",
       "collector_number": "4",
       "rarity": "Rare Holo",
-      "image_url": "http://localhost:3000/api/cards/image?id=base1-4",
+      "image_url": "https://v0-pokebinder.vercel.app/api/cards/image?id=base1-4",
       "price": { "usd": 300.0, "usd_foil": null, "eur": null }
     }
   ],
@@ -61,7 +61,7 @@ This loop walks the entire MTG catalog in pages of 50, printing each card's name
 ```bash
 cursor=""
 while :; do
-  url="http://localhost:3000/api/v1/cards?game=mtg&limit=50"
+  url="https://v0-pokebinder.vercel.app/api/v1/cards?game=mtg&limit=50"
   [ -n "$cursor" ] && url="$url&cursor=$cursor"
   resp=$(curl -s "$url")
   echo "$resp" | jq -r '.cards[].name'
@@ -84,7 +84,7 @@ async function fetchAllCards({ game, q } = {}) {
   let cursor = null;
 
   do {
-    const url = new URL("http://localhost:3000/api/v1/cards");
+    const url = new URL("https://v0-pokebinder.vercel.app/api/v1/cards");
     if (game) url.searchParams.set("game", game);
     if (q) url.searchParams.set("q", q);
     url.searchParams.set("limit", "100");

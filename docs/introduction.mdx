@@ -9,8 +9,9 @@ normalized card catalog. It is **read-only**, requires **no authentication**,
 returns **JSON**, and is **CORS-open** so you can call it straight from a browser
 app.
 
-The base URL in local development is `http://localhost:3000`. There are no API
-keys and no request body — every endpoint is a plain `GET`.
+The base URL is `https://v0-pokebinder.vercel.app` (or `http://localhost:3000` if
+you run Binder yourself). There are no API keys and no request body — every
+endpoint is a plain `GET`.
 
 ## What it is (and isn't)
 
@@ -55,15 +56,13 @@ for the full model.
 
 ## Base URL
 
-During local development:
-
 ```
-http://localhost:3000
+https://v0-pokebinder.vercel.app
 ```
 
 <Note>
-  A production base URL will be added once the app is deployed. Until then, run
-  the Binder app locally and call the API at `localhost:3000`.
+  Every example in these docs uses the production URL above, so you can run them
+  as-is. If you're running Binder locally instead, swap in `http://localhost:3000`.
 </Note>
 
 ## Endpoints

@@ -4,8 +4,9 @@ description: Errors, rate limits, caching, pagination, CORS, and attribution —
 ---
 
 Everything on this page holds for every endpoint under `/api/v1`. Read it once
-and you can call the whole API. The base URL in local development is
-`http://localhost:3000`, and no authentication is ever required.
+and you can call the whole API. The base URL is `https://v0-pokebinder.vercel.app`
+(or `http://localhost:3000` if you run Binder yourself), and no authentication is
+ever required.
 
 ## Errors
 
@@ -60,7 +61,7 @@ body:
 
 ```bash
 curl -H 'If-None-Match: W/"fbb4d020-783"' \
-  http://localhost:3000/api/v1/cards?limit=1
+  https://v0-pokebinder.vercel.app/api/v1/cards?limit=1
 # → HTTP/1.1 304 Not Modified   (empty body)
 ```
 
@@ -105,6 +106,6 @@ build a UI on this data, keep the attribution visible.
 ## The spec
 
 The machine-readable OpenAPI document is served at
-[`/api/v1/openapi.json`](http://localhost:3000/api/v1/openapi.json) and drives
+[`/api/v1/openapi.json`](https://v0-pokebinder.vercel.app/api/v1/openapi.json) and drives
 the **API reference** tab. It carries an `ETag` and is rate-limited like any
 other v1 endpoint.
